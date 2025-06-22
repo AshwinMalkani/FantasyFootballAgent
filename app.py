@@ -5,7 +5,7 @@ from players import PlayerDatabase
 import os
 
 app = Flask(__name__)
-CORS(app, origins=["http://localhost:5000", "http://127.0.0.1:5000", "http://localhost:8000"])
+CORS(app)
 
 # Initialize player database
 player_db = PlayerDatabase()
@@ -107,7 +107,7 @@ def get_roster(username):
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 8000))
+    port = int(os.environ.get('PORT', 5000))
     print(f"Players loaded: {len(player_db.players_by_id)}")
     print(f"Server starting on port {port}")
     app.run(debug=False, host='0.0.0.0', port=port)
