@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fantasy Football Agent</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #e2e8f0;
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 30px;
+            border: 1px solid rgba(148, 163, 184, 0.1);
+        }
+
+        .header h1 {
+            font-size: 3rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6, #06b6d4);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.2rem;
+            color: #94a3b8;
+            margin-bottom: 30px;
+        }
+
+        .input-section {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .input-group label {
+            font-size: 0.9rem;
+            color: #cbd5e1;
+            font-weight: 500;
+        }
+
+        input[type="text"] {
+            padding: 12px 16px;
+            border: 2px solid rgba(148, 163, 184, 0.2);
+            border-radius: 12px;
+            background: rgba(30, 41, 59, 0.8);
+            color: #e2e8f0;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            min-width: 200px;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 14px rgba(59, 130, 246, 0.3);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(59, 130, 246, 0.4);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 40px 0;
+        }
+
+        .spinner {
+            border: 3px solid rgba(59, 130, 246, 0.3);
+            border-top: 3px solid #3b82f6;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .dashboard {
+            display: none;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 25px;
+            margin-top: 30px;
+        }
+
+        .card {
+            background: rgba(30, 41, 59, 0.8);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 25px;
+            border: 1px solid rgba(148, 163, 184, 0.1);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+        }
+
+        .card-icon {
+            font-size: 1.5rem;
+        }
+
+        .card-title {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: #f1f5f9;
+        }
+
+        .player-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .player-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            background: rgba(51, 65, 85, 0.5);
+            border-radius: 12px;
+            border-left: 4px solid #3b82f6;
+            transition: all 0.3s ease;
+        }
+
+        .player-item:hover {
+            background: rgba(51, 65, 85, 0.8);
+            transform: translateX(5px);
+        }
+
+        .player-info {
+            flex: 1;
+        }
+
+        .player-name {
+            font-weight: 600;
+            color: #f1f5f9;
+            margin-bottom: 4px;
+        }
+
+        .player-details {
+            font-size: 0.85rem;
+            color: #94a3b8;
+        }
+
+        .injury-status {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .status-healthy {
+            background: rgba(34, 197, 94, 0.2);
+            color: #22c55e;
+        }
+
+        .status-questionable {
+            background: rgba(234, 179, 8, 0.2);
+            color: #eab308;
+        }
+
+        .status-out {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+        }
+
+        .status-doubtful {
+            background: rgba(249, 115, 22, 0.2);
+            color: #f97316;
+        }
+
+        .position-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+        }
+
+        .position-card {
+            background: rgba(51, 65, 85, 0.3);
+            border-radius: 12px;
+            padding: 15px;
+            text-align: center;
+            border: 1px solid rgba(148, 163, 184, 0.1);
+        }
+
+        .position-title {
+            font-weight: 700;
+            color: #3b82f6;
+            margin-bottom: 10px;
+            font-size: 1.1rem;
+        }
+
+        .position-players {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .position-player {
+            font-size: 0.9rem;
+            color: #cbd5e1;
+            padding: 6px 10px;
+            background: rgba(30, 41, 59, 0.5);
+            border-radius: 8px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-item {
+            text-align: center;
+            padding: 15px;
+            background: rgba(51, 65, 85, 0.3);
+            border-radius: 12px;
+        }
+
+        .stat-value {
+            font-size: 1.8rem;
+            font-weight: 800;
+            color: #3b82f6;
+            display: block;
+        }
+
+        .stat-label {
+            font-size: 0.8rem;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .alert {
+            padding: 16px 20px;
+            border-radius: 12px;
+            margin-bottom: 15px;
+            border-left: 4px solid;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .alert-high {
+            background: rgba(239, 68, 68, 0.1);
+            border-left-color: #ef4444;
+            color: #fecaca;
+        }
+
+        .alert-medium {
+            background: rgba(249, 115, 22, 0.1);
+            border-left-color: #f97316;
+            color: #fed7aa;
+        }
+
+        .alert-low {
+            background: rgba(234, 179, 8, 0.1);
+            border-left-color: #eab308;
+            color: #fef3c7;
+        }
+
+        .error-message {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #fecaca;
+            padding: 15px 20px;
+            border-radius: 12px;
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 15px;
+            }
+
+            .header h1 {
+                font-size: 2rem;
+            }
+
+            .input-section {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            input[type="text"] {
+                min-width: auto;
+            }
+
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>⚡ Fantasy Football Agent</h1>
+            <p>Your AI-powered fantasy football assistant</p>
+            
+            <div class="input-section">
+                <div class="input-group">
+                    <label for="username">Sleeper Username</label>
+                    <input type="text" id="username" placeholder="Enter your username">
+                </div>
+                <button class="btn-primary" onclick="loadRoster()">
+                    Load My Team
+                </button>
+            </div>
+        </div>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Loading your roster data...</p>
+        </div>
+
+        <div class="error-message" id="error" style="display: none;"></div>
+
+        <div class="dashboard" id="dashboard">
+            <!-- Team Overview -->
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-icon">📊</span>
+                    <h3 class="card-title">Team Overview</h3>
+                </div>
+                <div class="stats-grid" id="teamStats">
+                    <!-- Stats will be populated here -->
+                </div>
+            </div>
+
+            <!-- Starting Lineup -->
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-icon">🏈</span>
+                    <h3 class="card-title">Starting Lineup</h3>
+                </div>
+                <div class="player-list" id="startingLineup">
+                    <!-- Starting lineup will be populated here -->
+                </div>
+            </div>
+
+            <!-- Injury Alerts -->
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-icon">🚨</span>
+                    <h3 class="card-title">Injury Alerts</h3>
+                </div>
+                <div id="injuryAlerts">
+                    <!-- Injury alerts will be populated here -->
+                </div>
+            </div>
+
+            <!-- Roster by Position -->
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-icon">👥</span>
+                    <h3 class="card-title">Roster by Position</h3>
+                </div>
+                <div class="position-grid" id="positionGrid">
+                    <!-- Position breakdown will be populated here -->
+                </div>
+            </div>
+
+            <!-- Full Roster -->
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-icon">📋</span>
+                    <h3 class="card-title">Full Roster</h3>
+                </div>
+                <div class="player-list" id="fullRoster">
+                    <!-- Full roster will be populated here -->
+                </div>
+            </div>
+
+            <!-- Agent Recommendations -->
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-icon">🤖</span>
+                    <h3 class="card-title">Agent Recommendations</h3>
+                </div>
+                <div id="recommendations">
+                    <!-- AI recommendations will be populated here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Mock data - replace with actual API calls
+        const mockPlayerData = {
+            "6770": {
+                "full_name": "Tua Tagovailoa",
+                "position": "QB",
+                "team": "MIA",
+                "injury_status": "Questionable"
+            },
+            "5850": {
+                "full_name": "Saquon Barkley",
+                "position": "RB", 
+                "team": "PHI",
+                "injury_status": ""
+            },
+            "11655": {
+                "full_name": "Marvin Harrison Jr.",
+                "position": "WR",
+                "team": "ARI",
+                "injury_status": ""
+            },
+            "4983": {
+                "full_name": "Kyle Pitts",
+                "position": "TE",
+                "team": "ATL",
+                "injury_status": ""
+            },
+            "2133": {
+                "full_name": "Aaron Rodgers",
+                "position": "QB",
+                "team": "NYJ",
+                "injury_status": "Out"
+            },
+            "4217": {
+                "full_name": "CeeDee Lamb",
+                "position": "WR",
+                "team": "DAL",
+                "injury_status": ""
+            },
+            "9508": {
+                "full_name": "Brandon McManus",
+                "position": "K",
+                "team": "GB",
+                "injury_status": ""
+            },
+            "7090": {
+                "full_name": "Drake London",
+                "position": "WR",
+                "team": "ATL",
+                "injury_status": ""
+            },
+            "11533": {
+                "full_name": "Jayden Daniels",
+                "position": "QB",
+                "team": "WAS",
+                "injury_status": ""
+            },
+            "MIA": {
+                "full_name": "Miami Dolphins",
+                "position": "DEF",
+                "team": "MIA",
+                "injury_status": ""
+            }
+        };
+
+        const mockRosterData = {
+            starters: ["6770", "5850", "11655", "4983", "2133", "4217", "9508", "7090", "11533", "MIA"],
+            players: ["11533", "11655", "2133", "3321", "4035", "4217", "4981", "4983", "559", "5850", "6770", "6789", "7090", "9508", "954", "MIA"],
+            settings: {
+                wins: 9,
+                losses: 5,
+                fpts: 2110,
+                fpts_against: 1914
+            }
+        };
+
+        function getPlayerDisplay(playerId) {
+            const player = mockPlayerData[playerId];
+            if (!player) {
+                return {
+                    name: `Unknown Player (${playerId})`,
+                    position: 'UNK',
+                    team: 'FA',
+                    injury_status: ''
+                };
+            }
+            return player;
+        }
+
+        function getInjuryStatusClass(injuryStatus) {
+            if (!injuryStatus) return 'status-healthy';
+            const status = injuryStatus.toLowerCase();
+            if (status === 'out' || status === 'ir') return 'status-out';
+            if (status === 'doubtful') return 'status-doubtful';
+            if (status === 'questionable' || status === 'q') return 'status-questionable';
+            return 'status-healthy';
+        }
+
+        function getInjuryStatusText(injuryStatus) {
+            if (!injuryStatus) return 'Healthy';
+            return injuryStatus;
+        }
+
+        function createPlayerElement(playerId, isStarter = false) {
+            const player = getPlayerDisplay(playerId);
+            const injuryClass = getInjuryStatusClass(player.injury_status);
+            const injuryText = getInjuryStatusText(player.injury_status);
+            
+            return `
+                <div class="player-item">
+                    <div class="player-info">
+                        <div class="player-name">${player.name}</div>
+                        <div class="player-details">${player.position} • ${player.team}</div>
+                    </div>
+                    <div class="injury-status ${injuryClass}">
+                        ${injuryText}
+                    </div>
+                </div>
+            `;
+        }
+
+        function populateTeamStats(roster) {
+            const statsHtml = `
+                <div class="stat-item">
+                    <span class="stat-value">${roster.settings.wins}</span>
+                    <span class="stat-label">Wins</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value">${roster.settings.losses}</span>
+                    <span class="stat-label">Losses</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value">${roster.settings.fpts}</span>
+                    <span class="stat-label">Points For</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value">${roster.settings.fpts_against}</span>
+                    <span class="stat-label">Points Against</span>
+                </div>
+            `;
+            document.getElementById('teamStats').innerHTML = statsHtml;
+        }
+
+        function populateStartingLineup(starters) {
+            const startersHtml = starters.map(playerId => createPlayerElement(playerId, true)).join('');
+            document.getElementById('startingLineup').innerHTML = startersHtml;
+        }
+
+        function populateFullRoster(players) {
+            const rosterHtml = players.map(playerId => createPlayerElement(playerId)).join('');
+            document.getElementById('fullRoster').innerHTML = rosterHtml;
+        }
+
+        function populateInjuryAlerts(players) {
+            const injured = players.filter(playerId => {
+                const player = getPlayerDisplay(playerId);
+                return player.injury_status && player.injury_status.toLowerCase() !== 'healthy';
+            });
+
+            if (injured.length === 0) {
+                document.getElementById('injuryAlerts').innerHTML = '<div class="alert alert-low">✅ No injury concerns detected!</div>';
+                return;
+            }
+
+            const alertsHtml = injured.map(playerId => {
+                const player = getPlayerDisplay(playerId);
+                const status = player.injury_status.toLowerCase();
+                let alertClass = 'alert-low';
+                let icon = '🟡';
+                
+                if (status === 'out' || status === 'ir') {
+                    alertClass = 'alert-high';
+                    icon = '🚨';
+                } else if (status === 'doubtful') {
+                    alertClass = 'alert-medium';
+                    icon = '⚠️';
+                }
+
+                return `
+                    <div class="alert ${alertClass}">
+                        <span>${icon}</span>
+                        <span>${player.name} (${player.position}, ${player.team}) is ${player.injury_status}</span>
+                    </div>
+                `;
+            }).join('');
+
+            document.getElementById('injuryAlerts').innerHTML = alertsHtml;
+        }
+
+        function populatePositionGrid(players) {
+            const positions = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'];
+            const positionGroups = {};
+
+            positions.forEach(pos => {
+                positionGroups[pos] = players.filter(playerId => {
+                    const player = getPlayerDisplay(playerId);
+                    return player.position === pos;
+                });
+            });
+
+            const gridHtml = positions.map(pos => {
+                const posPlayers = positionGroups[pos];
+                const playersHtml = posPlayers.map(playerId => {
+                    const player = getPlayerDisplay(playerId);
+                    const injuryText = player.injury_status ? ` (${player.injury_status})` : '';
+                    return `<div class="position-player">${player.name} - ${player.team}${injuryText}</div>`;
+                }).join('');
+
+                return `
+                    <div class="position-card">
+                        <div class="position-title">${pos}</div>
+                        <div class="position-players">
+                            ${playersHtml || '<div class="position-player">No players</div>'}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            document.getElementById('positionGrid').innerHTML = gridHtml;
+        }
+
+        function populateRecommendations(players) {
+            // Mock AI recommendations
+            const recommendations = [
+                {
+                    type: 'alert-high',
+                    icon: '🚨',
+                    text: 'Aaron Rodgers is OUT - start Jayden Daniels at QB immediately!'
+                },
+                {
+                    type: 'alert-medium',
+                    icon: '⚠️',
+                    text: 'Tua Tagovailoa is questionable - monitor his status before Sunday'
+                },
+                {
+                    type: 'alert-low',
+                    icon: '💡',
+                    text: 'Consider streaming a defense with a better matchup this week'
+                }
+            ];
+
+            const recHtml = recommendations.map(rec => `
+                <div class="alert ${rec.type}">
+                    <span>${rec.icon}</span>
+                    <span>${rec.text}</span>
+                </div>
+            `).join('');
+
+            document.getElementById('recommendations').innerHTML = recHtml;
+        }
+
+        function showError(message) {
+            document.getElementById('error').style.display = 'block';
+            document.getElementById('error').textContent = message;
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('dashboard').style.display = 'none';
+        }
+
+        function hideError() {
+            document.getElementById('error').style.display = 'none';
+        }
+
+        async function loadRoster() {
+    const username = document.getElementById('username').value.trim();
+    
+    if (!username) {
+        showError('Please enter your Sleeper username');
+        return;
+    }
+
+    hideError();
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('dashboard').style.display = 'none';
+
+    try {
+        console.log(`Loading roster for: ${username}`);
+        
+        // Call Flask backend for REAL roster data
+        const response = await fetch(`http://localhost:8000/api/roster/${username}`);
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.error || 'Failed to load roster');
+        }
+
+        console.log('Real roster data received:', data);
+
+        // Use REAL data for full roster and position grid
+        populateFullRoster(data.players);
+        populatePositionGrid(data.roster_by_position);
+
+        // Keep using MOCK data for everything else
+        const mockRosterData = {
+            starters: ["6770", "5850", "11655", "4983", "2133", "4217", "9508", "7090", "11533", "MIA"],
+            settings: { wins: 9, losses: 5, fpts: 2110, fpts_against: 1914 }
+        };
+
+        populateTeamStats(mockRosterData);
+        populateStartingLineup(mockRosterData.starters);
+        populateInjuryAlerts(mockRosterData.starters); // Using mock
+        populateRecommendations([]); // Using mock
+
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('dashboard').style.display = 'grid';
+
+    } catch (error) {
+        console.error('Error loading roster:', error);
+        
+        let errorMessage = 'Failed to load roster data. ';
+        if (error.message.includes('User') && error.message.includes('not found')) {
+            errorMessage += 'Username not found. Please check your Sleeper username.';
+        } else if (error.message.includes('Failed to fetch')) {
+            errorMessage += 'Make sure the Flask server is running on port 8000.';
+        } else {
+            errorMessage += error.message;
+        }
+        
+        showError(errorMessage);
+    }
+}
+
+        function populateFullRoster(players) {
+            // Now uses REAL player data from your backend
+            const rosterHtml = players.map(player => createPlayerElementReal(player)).join('');
+            document.getElementById('fullRoster').innerHTML = rosterHtml;
+        }
+
+        function populatePositionGrid(rosterByPosition) {
+            // Now uses REAL position data from your backend
+            const positions = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'];
+            
+            const gridHtml = positions.map(pos => {
+                const posPlayers = rosterByPosition[pos] || [];
+                const playersHtml = posPlayers.map(player => {
+                    const injuryText = player.injury_status ? ` (${player.injury_status})` : '';
+                    return `<div class="position-player">${player.name} - ${player.team}${injuryText}</div>`;
+                }).join('');
+
+                return `
+                    <div class="position-card">
+                        <div class="position-title">${pos}</div>
+                        <div class="position-players">
+                            ${playersHtml || '<div class="position-player">No players</div>'}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            document.getElementById('positionGrid').innerHTML = gridHtml;
+        }
+
+        function createPlayerElementReal(player) {
+            // New function for REAL player data
+            const injuryClass = getInjuryStatusClass(player.injury_status);
+            const injuryText = getInjuryStatusText(player.injury_status);
+            
+            return `
+                <div class="player-item">
+                    <div class="player-info">
+                        <div class="player-name">${player.name}</div>
+                        <div class="player-details">${player.position} • ${player.team}</div>
+                    </div>
+                    <div class="injury-status ${injuryClass}">
+                        ${injuryText}
+                    </div>
+                </div>
+            `;
+        }
+
+
+        // Allow Enter key to submit
+        document.getElementById('username').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                loadRoster();
+            }
+        });
+    </script>
+</body>
+</html>
