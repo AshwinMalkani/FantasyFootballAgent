@@ -736,7 +736,7 @@
         console.log(`Loading roster for: ${username}`);
         
         // Call Flask backend for REAL roster data
-        const response = await fetch(`http://localhost:8000/api/roster/${username}`);
+        const response = await fetch(`/api/roster/${username}`);
         const data = await response.json();
         
         if (!response.ok) {
