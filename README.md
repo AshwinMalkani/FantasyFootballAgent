@@ -43,11 +43,16 @@ current season are picked up automatically.
 
 Cookies last roughly a year; when they expire the ESPN card on the dashboard tells you.
 
-### Yahoo (OAuth app, one-time)
+### Yahoo (OAuth app, one-time; needs Yahoo approval)
+
+> As of 2026 Yahoo no longer self-serves Fantasy Sports API access. After creating the app you
+> must also apply at https://sports.yahoo.com/developer/access/ with your Client ID. Until Yahoo
+> approves, every Fantasy call returns 401 and the dashboard card says so.
+
 1. Go to https://developer.yahoo.com/apps/create and create an app:
-   - Application type: **Installed Application**
-   - Redirect URI: `oob` (or `https://localhost`)
-   - API permissions: **Fantasy Sports – Read**
+   - OAuth Client Type: **Confidential Client**
+   - Redirect URI: `oob`
+   - API permissions: leave unchecked (Fantasy Sports is granted through the access application)
 2. Create `backend/oauth2.json`:
    ```json
    {"consumer_key": "YOUR_CLIENT_ID", "consumer_secret": "YOUR_CLIENT_SECRET"}

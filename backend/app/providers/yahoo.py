@@ -15,6 +15,9 @@ SLOT_MAP = {"W/R/T": "FLEX", "W/R": "WRRB_FLEX", "Q/W/R/T": "SUPER_FLEX", "BN": 
             "DEF": "DEF", "K": "K", "QB": "QB", "RB": "RB", "WR": "WR", "TE": "TE", "D": "IDP_FLEX"}
 PRIMARY = ["QB", "RB", "WR", "TE", "K", "DEF"]
 HINT = "Run the Yahoo OAuth setup (see README): backend/oauth2.json needs consumer_key/consumer_secret, then authorize once."
+AUTHORIZE_CMD = ("cd backend && ./.venv/bin/python -c \"from yahoo_oauth import OAuth2; OAuth2(None, None, from_file='oauth2.json')\"")
+APPROVAL_HINT = ("Yahoo has not approved this app for the Fantasy Sports API yet (every app now needs manual approval via "
+                 "sports.yahoo.com/developer/access). The card will start working on its own once Yahoo approves.")
 
 
 class YahooProvider:
@@ -29,8 +32,15 @@ class YahooProvider:
 
     # ---- raw ---------------------------------------------------------
     def _session(self):
+        import json
         if not self.oauth_path.exists():
             raise ProviderError(f"Yahoo oauth file not found: {self.oauth_path}", HINT)
+        creds = json.loads(self.oauth_path.read_text() or "{}")
+        if not creds.get("consumer_key") or not creds.get("consumer_secret"):
+            raise ProviderError("oauth2.json is missing consumer_key / consumer_secret", HINT)
+        if not creds.get("refresh_token"):
+            # Never start the interactive browser login inside the server.
+            raise ProviderError("Yahoo is not authorized yet", f"Run once in a terminal: {AUTHORIZE_CMD}")
         from yahoo_oauth import OAuth2
         sc = OAuth2(None, None, from_file=str(self.oauth_path))
         if not sc.token_is_valid():
@@ -43,7 +53,11 @@ class YahooProvider:
             try:
                 gm = yfa.Game(self._session(), "nfl")
                 ids = gm.league_ids(year=self.state.season)
+            except ProviderError:
+                raise
             except Exception as e:
+                if "additional_authorization_required" in str(e) or "401" in str(e):
+                    raise ProviderError("Yahoo returned 401: app not yet approved for Fantasy Sports", APPROVAL_HINT) from e
                 raise ProviderError(f"Yahoo auth/league lookup failed: {e}", HINT) from e
             if not ids:
                 raise ProviderError(f"No Yahoo NFL leagues found for {self.state.season}")
