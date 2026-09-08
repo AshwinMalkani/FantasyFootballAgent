@@ -102,7 +102,16 @@ export interface ActivityLeague {
   projected: number
 }
 
-export interface ActivityPlay { id: string; text: string; scoring: boolean; wallclock: string | null; clock: string | null; period: number | null }
+export interface ActivityPlay {
+  id: string
+  text: string
+  summary: string | null
+  scoring: boolean
+  wallclock: string | null
+  clock: string | null
+  period: number | null
+  league_points: { league_key: string; league_name: string; platform: Platform; delta: number }[]
+}
 
 export interface ActivityPlayer {
   sleeper_id: string
@@ -123,6 +132,7 @@ export interface ActivityEvent {
   kind: 'stats' | 'play'
   sleeper_id: string
   name: string
+  summary: string | null
   text: string | null
   stat_diff: { stat: string; delta: number }[]
   league_deltas: { league_key: string; league_name: string; platform: Platform; delta: number | null }[]

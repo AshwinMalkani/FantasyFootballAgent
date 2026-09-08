@@ -173,9 +173,15 @@ def record_changes(sleeper_id: str, name: str, stats: dict, league_points: list[
     deltas = [d for d in deltas if abs(d["delta"]) >= 0.05]
     if not diff and not deltas:
         return
+    label = {"pass_yd": "pass yds", "pass_td": "pass TD", "pass_int": "INT", "rush_att": "carries", "rush_yd": "rush yds",
+             "rush_td": "rush TD", "rec": "rec", "rec_yd": "rec yds", "rec_td": "rec TD", "fum_lost": "fumble lost",
+             "fgm": "FG", "xpm": "XP", "sack": "sacks", "int": "INT", "fum_rec": "FR", "def_td": "def TD", "pts_allow": "pts allowed"}
+    summary = ", ".join(f"{'+' if d['delta'] > 0 else ''}{int(d['delta']) if float(d['delta']).is_integer() else d['delta']} {label.get(d['stat'], d['stat'])}"
+                        for d in diff if d["stat"] != "rush_att") or "points updated"
     _events.appendleft({
         "ts": datetime.now(timezone.utc).isoformat(),
         "kind": "stats",
+        "summary": summary,
         "sleeper_id": sleeper_id,
         "name": name,
         "stat_diff": diff,

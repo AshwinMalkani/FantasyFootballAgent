@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from ..models import BENCH_SLOTS, LeagueError
 from ..providers.registry import all_leagues, build_providers, current_state
 from .live import live_stats, play_mentions, play_name_keys, plays, recent_events, record_changes, scoreboard, stat_line
+from .playparse import parse_play, play_points
 from .scoring import approx_points, score_stat_line
 
 REC_BY_LABEL = {"PPR": 1.0, "Half PPR": 0.5, "Standard": 0.0}
@@ -39,10 +40,12 @@ def build_activity(include_bench: bool = False, season: int | None = None, week:
     board = scoreboard(date)
 
     players: dict[str, dict] = {}
+    league_scoring: dict[str, tuple] = {}
     for s, d in details:
         if d is None:
             continue
         league_key = f"{s.platform}:{s.league_id}"
+        league_scoring[league_key] = (d.scoring if s.platform == "sleeper" else None, REC_BY_LABEL.get(s.scoring_label or "", 0.5))
         for rs in d.roster:
             p = rs.player
             if not p or not p.sleeper_id:
@@ -85,7 +88,20 @@ def build_activity(include_bench: bool = False, season: int | None = None, week:
         if not g or g["event_id"] not in game_plays or e["position"] == "DEF":
             continue
         keys = play_name_keys(e["name"])
-        e["plays"] = [p for p in game_plays[g["event_id"]] if play_mentions(p["text"], keys)][:6]
+        matched = [p for p in game_plays[g["event_id"]] if play_mentions(p["text"], keys)][:8]
+        out = []
+        for p in matched:
+            parsed = parse_play(p["text"], keys[0], e["nfl_team"])
+            p = dict(p)
+            p["summary"] = parsed["summary"] if parsed else None
+            p["league_points"] = []
+            if parsed:
+                for l in e["leagues"]:
+                    scoring, rec = league_scoring[l["league_key"]]
+                    p["league_points"].append({"league_key": l["league_key"], "league_name": l["league_name"],
+                                               "platform": l["platform"], "delta": play_points(parsed["delta"], scoring, rec)})
+            out.append(p)
+        e["plays"] = out
 
     # Feed: stat changes since the last poll + scoring plays involving my players.
     for e in players.values():
@@ -95,13 +111,15 @@ def build_activity(include_bench: bool = False, season: int | None = None, week:
     seen_play_ids = {ev.get("play_id") for ev in events}
     for e in players.values():
         for p in e["plays"]:
-            if p["scoring"] and p["id"] not in seen_play_ids:
-                events.append({
-                    "ts": p.get("wallclock") or datetime.now(timezone.utc).isoformat(), "kind": "play", "play_id": p["id"],
-                    "sleeper_id": e["sleeper_id"], "name": e["name"], "text": p["text"],
-                    "stat_diff": [], "league_deltas": [{"league_key": l["league_key"], "league_name": l["league_name"],
-                                                        "platform": l["platform"], "delta": None} for l in e["leagues"]],
-                })
+            if p["id"] in seen_play_ids or not p.get("summary"):
+                continue
+            if not any(abs(lp["delta"]) >= 1.0 for lp in p["league_points"]):  # skip 2-yd runs and the like
+                continue
+            events.append({
+                "ts": p.get("wallclock") or datetime.now(timezone.utc).isoformat(), "kind": "play", "play_id": p["id"],
+                "sleeper_id": e["sleeper_id"], "name": e["name"], "summary": p["summary"], "text": p["text"],
+                "stat_diff": [], "league_deltas": p["league_points"],
+            })
     events.sort(key=lambda ev: ev["ts"], reverse=True)
 
     def sort_key(e):

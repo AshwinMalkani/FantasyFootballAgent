@@ -50,13 +50,10 @@ function EventRow({ e }: { e: ActivityEvent }) {
   return (
     <li className="border-t border-slate-800/80 py-2 text-sm first:border-t-0">
       <div className="flex items-baseline justify-between gap-2">
-        <span className="font-semibold">{e.name}</span>
+        <span><span className="font-semibold">{e.name}</span> <span className="text-amber-200">{e.summary ?? e.text}</span></span>
         <span className="shrink-0 text-[11px] text-slate-500">{ago(e.ts)}</span>
       </div>
-      {e.text && <div className={`mt-0.5 text-xs ${e.kind === 'play' ? 'text-amber-200' : 'text-slate-300'}`}>{e.text}</div>}
-      {e.stat_diff.length > 0 && (
-        <div className="mt-0.5 text-xs text-slate-400">{e.stat_diff.map((d) => `${d.stat.replace('_', ' ')} ${d.delta > 0 ? '+' : ''}${d.delta}`).join(' · ')}</div>
-      )}
+      {e.kind === 'play' && e.text && <div className="mt-0.5 line-clamp-1 text-[11px] text-slate-500" title={e.text}>{e.text}</div>}
       <div className="mt-1 flex flex-wrap gap-1">
         {e.league_deltas.map((d) => (
           <span key={d.league_key} className="rounded bg-slate-800 px-1.5 py-0.5 text-[11px]">
@@ -111,7 +108,7 @@ export default function Activity() {
                   <tr key={p.sleeper_id} className={`border-t border-slate-800/80 align-top ${live ? 'bg-emerald-500/5' : ''}`}>
                     <td className="px-3 py-2">
                       <div className="flex items-center gap-2 font-medium">{p.name}<span className="text-xs text-slate-400">{p.position} · {p.nfl_team}</span>{p.injury_status && <StatusPill p={{ ...p, on_bye: false, projected_points: 0, projection_source: 'none', opponent: null, platform_player_id: p.sleeper_id }} />}</div>
-                      {p.plays[0] && <div className="mt-1 max-w-md text-xs text-slate-400">↳ {p.plays[0].text}</div>}
+                      {p.plays[0] && <div className="mt-1 max-w-md text-xs text-slate-400" title={p.plays[0].text}>↳ {p.plays[0].summary ?? p.plays[0].text}</div>}
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 text-xs">
                       {g ? <><div className={live ? 'text-emerald-300' : 'text-slate-300'}>{g.away} @ {g.home}</div><div className="text-slate-500">{g.detail}</div></> : <span className="text-slate-500">—</span>}
