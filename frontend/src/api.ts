@@ -1,4 +1,4 @@
-import type { LeagueDetail, LeagueRow, LineupSuggestion, NflState, WaiverTarget } from './types'
+import type { Activity, LeagueDetail, LeagueRow, LineupSuggestion, NflState, WaiverTarget } from './types'
 
 export class ApiError extends Error {
   hint: string | null
@@ -29,5 +29,6 @@ export const api = {
   detail: (p: string, id: string) => get<LeagueDetail>(`/api/leagues/${p}/${id}`),
   lineup: (p: string, id: string) => get<LineupSuggestion>(`/api/leagues/${p}/${id}/lineup`),
   waivers: (p: string, id: string) => get<WaiverTarget[]>(`/api/leagues/${p}/${id}/waivers`),
+  activity: (bench: boolean, debug = '') => get<Activity>(`/api/activity?bench=${bench}${debug}`),
   refresh: async () => { const r = await fetch('/api/refresh', { method: 'POST' }); return r.json() },
 }

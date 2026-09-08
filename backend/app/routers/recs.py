@@ -5,6 +5,7 @@ from ..models import LineupSuggestion, WaiverTarget
 from ..providers.base import ProviderError
 from ..providers.registry import get_provider
 from ..services.players import reset_player_db
+from ..services.live import reset_tracking
 from ..services.projections import trending_adds
 from ..services.recommendations import optimize_lineup, rank_waivers
 
@@ -35,4 +36,5 @@ def waivers(platform: str, league_id: str, limit: int = 15):
 def refresh():
     n = clear_all()
     reset_player_db()
+    reset_tracking()
     return {"cleared": n}

@@ -1,6 +1,7 @@
 import { Route, Routes } from 'react-router-dom'
 import Dashboard from './pages/Dashboard'
 import League from './pages/League'
+import Activity from './pages/Activity'
 import Header from './components/Header'
 
 export default function App() {
@@ -11,6 +12,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/league/:platform/:leagueId" element={<League />} />
+          <Route path="/activity" element={<Activity />} />
         </Routes>
       </main>
     </div>

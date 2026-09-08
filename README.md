@@ -74,6 +74,14 @@ Cookies last roughly a year; when they expire the ESPN card on the dashboard tel
 - **Waiver ranker**: `score = lineup gain + position-weighted depth value + min(5, log10(1 + Sleeper trending adds))`, with
   a suggested drop (lowest-projected bench player at the same position, never someone on bye).
 
+## Live page (game days)
+
+The **Live** tab polls every 30 seconds and shows every rostered player across all leagues with
+their game status, live stat line (Sleeper, refreshed every 30s), points in each league, and the
+latest ESPN play-by-play lines that mention them. The right-hand feed lists point changes since the
+last poll and scoring plays. To preview it outside of game time:
+`http://localhost:5173/activity?season=2025&week=1&date=20250907`.
+
 ## API
 
 | Endpoint | Returns |
@@ -83,6 +91,7 @@ Cookies last roughly a year; when they expire the ESPN card on the dashboard tel
 | `GET /api/leagues/{platform}/{id}` | roster, slot template, scoring |
 | `GET /api/leagues/{platform}/{id}/lineup` | current vs suggested starters and moves |
 | `GET /api/leagues/{platform}/{id}/waivers` | ranked free agents with suggested drops |
+| `GET /api/activity?bench=false` | game-day view: my players across leagues with live stats, plays, per-league points, and a change feed (add `season`, `week`, `date=YYYYMMDD` to replay a past week) |
 | `POST /api/refresh` | clear all caches |
 
 ## Tests

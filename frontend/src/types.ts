@@ -76,3 +76,63 @@ export interface WaiverTarget {
 }
 
 export interface NflState { season: number; week: number; season_type: string }
+
+export interface GameInfo {
+  event_id: string
+  name: string
+  start: string | null
+  state: 'pre' | 'in' | 'post'
+  detail: string | null
+  clock: string | null
+  period: number | null
+  home: string | null
+  away: string | null
+  home_score: string | null
+  away_score: string | null
+}
+
+export interface ActivityLeague {
+  league_key: string
+  platform: Platform
+  league_id: string
+  league_name: string
+  slot: string
+  is_starter: boolean
+  points: number
+  projected: number
+}
+
+export interface ActivityPlay { id: string; text: string; scoring: boolean; wallclock: string | null; clock: string | null; period: number | null }
+
+export interface ActivityPlayer {
+  sleeper_id: string
+  name: string
+  position: string
+  nfl_team: string | null
+  injury_status: string | null
+  leagues: ActivityLeague[]
+  stat_line: string
+  updated_at: number | null
+  game: GameInfo | null
+  plays: ActivityPlay[]
+  pts_ppr: number
+}
+
+export interface ActivityEvent {
+  ts: string
+  kind: 'stats' | 'play'
+  sleeper_id: string
+  name: string
+  text: string | null
+  stat_diff: { stat: string; delta: number }[]
+  league_deltas: { league_key: string; league_name: string; platform: Platform; delta: number | null }[]
+}
+
+export interface Activity {
+  updated_at: string
+  season: number
+  week: number
+  games: GameInfo[]
+  players: ActivityPlayer[]
+  events: ActivityEvent[]
+}
