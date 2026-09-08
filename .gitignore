@@ -1,0 +1,20 @@
+# secrets / local config
+.env
+backend/oauth2.json
+backend/.cache/
+nfl_players.json
+
+# python
+backend/.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# node
+frontend/node_modules/
+frontend/dist/
+
+# os / editor
+.DS_Store
+.vscode/
+.idea/

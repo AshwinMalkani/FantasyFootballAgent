@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+httpx
+pydantic-settings
+espn-api
+yahoo_fantasy_api
+yahoo-oauth
+pytest

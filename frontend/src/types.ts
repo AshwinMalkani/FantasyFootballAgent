@@ -1,0 +1,78 @@
+export type Platform = 'sleeper' | 'espn' | 'yahoo'
+
+export interface Player {
+  sleeper_id: string | null
+  platform_player_id: string
+  name: string
+  position: string
+  nfl_team: string | null
+  injury_status: string | null
+  on_bye: boolean
+  opponent: string | null
+  projected_points: number
+  projection_source: 'espn' | 'sleeper-exact' | 'sleeper-approx' | 'none'
+}
+
+export interface RosterSlot { slot: string; player: Player | null }
+
+export interface LeagueSummary {
+  platform: Platform
+  league_id: string
+  name: string
+  season: number
+  week: number
+  team_name: string
+  record: string
+  rank: number | null
+  total_teams: number | null
+  points_for: number | null
+  opponent_name: string | null
+  my_projected_total: number | null
+  opp_projected_total: number | null
+  waiver_type: string | null
+  faab_remaining: number | null
+  waiver_priority: number | null
+  scoring_label: string | null
+  url: string | null
+}
+
+export interface LeagueError {
+  platform: Platform
+  league_id: string | null
+  name: string | null
+  error: string
+  hint: string | null
+}
+
+export type LeagueRow = LeagueSummary | LeagueError
+export const isError = (r: LeagueRow): r is LeagueError => 'error' in r
+
+export interface LeagueDetail {
+  summary: LeagueSummary
+  roster: RosterSlot[]
+  lineup_slots: string[]
+  scoring: Record<string, number>
+}
+
+export interface LineupMove { slot: string; out: Player | null; in: Player; delta: number }
+
+export interface LineupSuggestion {
+  current_starters: RosterSlot[]
+  suggested_starters: RosterSlot[]
+  moves: LineupMove[]
+  current_total: number
+  suggested_total: number
+  projected_gain: number
+  flags: string[]
+}
+
+export interface WaiverTarget {
+  player: Player
+  score: number
+  trending_adds: number
+  lineup_gain: number
+  suggested_drop: Player | null
+  net_gain: number | null
+}
+
+export interface NflState { season: number; week: number; season_type: string }
