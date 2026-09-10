@@ -1,14 +1,14 @@
 import { useQuery } from '@tanstack/react-query'
 import { api, ApiError } from '../api'
 import type { RosterSlot } from '../types'
-import PlayerCell, { fmt } from './PlayerCell'
+import PlayerCell, { ActualCell, fmt } from './PlayerCell'
 
 function Col({ title, rows, total, highlight }: { title: string; rows: RosterSlot[]; total: number; highlight: Set<string> }) {
   return (
     <div className="overflow-x-auto rounded-xl border border-slate-800">
       <table className="w-full text-sm">
         <thead className="bg-slate-900/80 text-left text-xs uppercase tracking-wide text-slate-400">
-          <tr><th className="px-3 py-2" colSpan={2}>{title}</th><th className="px-3 py-2 text-right">{fmt(total)}</th></tr>
+          <tr><th className="px-3 py-2" colSpan={2}>{title}</th><th className="px-3 py-2 text-right">Actual</th><th className="px-3 py-2 text-right">Proj {fmt(total)}</th></tr>
         </thead>
         <tbody>
           {rows.map((r, i) => {
@@ -17,7 +17,8 @@ function Col({ title, rows, total, highlight }: { title: string; rows: RosterSlo
               <tr key={i} className={`border-t border-slate-800/80 ${hl ? 'bg-amber-500/10' : ''}`}>
                 <td className="w-24 px-3 py-2 text-xs font-semibold text-slate-400">{r.slot}</td>
                 <td className="px-3 py-2"><PlayerCell p={r.player} /></td>
-                <td className="px-3 py-2 text-right tabular-nums">{r.player ? fmt(r.player.projected_points) : '–'}</td>
+                <td className="px-3 py-2 text-right"><ActualCell p={r.player} /></td>
+                <td className="px-3 py-2 text-right tabular-nums text-slate-400">{r.player ? fmt(r.player.projected_points) : '–'}</td>
               </tr>
             )
           })}

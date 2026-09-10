@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { api, ApiError } from '../api'
 import PlatformBadge from '../components/PlatformBadge'
-import { fmt } from '../components/PlayerCell'
+import { Scoreline } from '../components/PlayerCell'
 import RosterTab from '../components/RosterTab'
 import LineupTab from '../components/LineupTab'
 import WaiversTab from '../components/WaiversTab'
@@ -40,7 +40,7 @@ export default function League() {
       </div>
       <div className="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-sm text-slate-300">
         <span><b>{s.record}</b>{s.rank ? ` · #${s.rank}${s.total_teams ? ` of ${s.total_teams}` : ''}` : ''}</span>
-        <span>Week {s.week}{s.opponent_name ? ` vs ${s.opponent_name}` : ''}: <b>{fmt(s.my_projected_total)}</b> – {fmt(s.opp_projected_total)}</span>
+        <span className="flex items-baseline gap-2">Week {s.week}{s.opponent_name ? ` vs ${s.opponent_name}` : ''}: <Scoreline my={s.my_actual_total} opp={s.opp_actual_total} myProj={s.my_projected_total} oppProj={s.opp_projected_total} live={s.in_progress} /></span>
         <span>{s.scoring_label}</span>
         <span>{s.waiver_type === 'FAAB' ? `FAAB $${s.faab_remaining ?? '?'}` : s.waiver_priority ? `Waiver priority #${s.waiver_priority}` : ''}</span>
       </div>

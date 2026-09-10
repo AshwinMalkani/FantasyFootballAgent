@@ -18,6 +18,9 @@ def build_player(
     scoring: dict[str, float] | None = None,
     rec_value: float | None = None,
     platform_points: float | None = None,
+    live: dict[str, dict] | None = None,
+    board: dict[str, dict] | None = None,
+    platform_actual: float | None = None,
 ) -> Player:
     nfl_team = norm_team(nfl_team)
     proj = projections.get(sleeper_id) if sleeper_id else None
@@ -32,8 +35,25 @@ def build_player(
     elif proj:
         points, source = approx_points(proj["stats"], rec_value if rec_value is not None else 0.5), "sleeper-approx"
 
+    game_state = None
+    if board and nfl_team and nfl_team in board:
+        game_state = board[nfl_team].get("state")
+    actual: float | None = None
+    if game_state in ("in", "post"):
+        stats = (live or {}).get(sleeper_id or "", {}).get("stats") if live else None
+        if platform_actual is not None:
+            actual = round(float(platform_actual), 2)
+        elif stats and scoring:
+            actual = score_stat_line(stats, scoring)
+        elif stats:
+            actual = approx_points(stats, rec_value if rec_value is not None else 0.5)
+        else:
+            actual = 0.0
+
     return Player(
         sleeper_id=sleeper_id,
+        actual_points=actual,
+        game_state=game_state,
         platform_player_id=str(platform_player_id),
         name=name,
         position=position,

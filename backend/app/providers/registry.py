@@ -4,6 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 from ..config import settings
 from ..models import LeagueError, LeagueSummary, NflState
 from ..services.players import player_db
+from ..services.live import live_stats, scoreboard
 from ..services.projections import nfl_state, weekly_projections
 from .base import Provider, ProviderError
 
@@ -19,17 +20,21 @@ def build_providers() -> dict[str, Provider]:
     state = current_state()
     db = player_db()
     proj = weekly_projections(state.season, state.week)
+    try:
+        live = {"stats": live_stats(state.season, state.week), "board": scoreboard()}
+    except Exception:  # live data is best-effort; never block the dashboard on it
+        live = {"stats": {}, "board": {}}
     out: dict[str, Provider] = {}
     if settings.sleeper_username:
         from .sleeper import SleeperProvider
-        out["sleeper"] = SleeperProvider(settings.sleeper_username, state, db, proj)
+        out["sleeper"] = SleeperProvider(settings.sleeper_username, state, db, proj, live)
     if settings.espn_league_id and settings.espn_s2 and settings.espn_swid:
         from .espn import EspnProvider
         out["espn"] = EspnProvider(settings.espn_league_id, settings.espn_s2, settings.espn_swid,
-                                   settings.espn_team_id, state, db, proj)
+                                   settings.espn_team_id, state, db, proj, live)
     if settings.yahoo_oauth_path.exists() or settings.yahoo_league_id:
         from .yahoo import YahooProvider
-        out["yahoo"] = YahooProvider(settings.yahoo_oauth_path, settings.yahoo_league_id, state, db, proj)
+        out["yahoo"] = YahooProvider(settings.yahoo_oauth_path, settings.yahoo_league_id, state, db, proj, live)
     return out
 
 

@@ -28,3 +28,32 @@ export default function PlayerCell({ p, empty = 'Empty' }: { p: Player | null; e
 }
 
 export const fmt = (n: number | null | undefined) => (n == null ? '–' : n.toFixed(1))
+
+/** Actual points, or a dash before the game; dims the number when the game is over. */
+export function ActualCell({ p }: { p: Player | null }) {
+  if (!p || p.actual_points == null) return <span className="text-slate-600">–</span>
+  const live = p.game_state === 'in'
+  return (
+    <span className={`tabular-nums ${live ? 'font-semibold text-emerald-300' : 'text-slate-100'}`}>
+      {live && <span className="mr-1 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400 align-middle" />}
+      {fmt(p.actual_points)}
+    </span>
+  )
+}
+
+export function Scoreline({ my, opp, myProj, oppProj, live }: { my: number | null; opp: number | null; myProj: number | null; oppProj: number | null; live: boolean }) {
+  const hasActual = my != null
+  const a = hasActual ? my : myProj
+  const b = hasActual ? opp : oppProj
+  const winning = a != null && b != null && a >= b
+  return (
+    <div className="flex items-baseline gap-2">
+      <span className={`font-semibold ${winning ? 'text-emerald-300' : 'text-slate-200'}`}>{fmt(a)}</span>
+      <span className="text-slate-500">–</span>
+      <span className={`font-semibold ${!winning && b != null ? 'text-red-300' : 'text-slate-200'}`}>{fmt(b)}</span>
+      {hasActual
+        ? <span className="text-xs text-slate-500">{live && <span className="mr-1 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400 align-middle" />}{live ? 'live' : 'actual'} · proj {fmt(myProj)}–{fmt(oppProj)}</span>
+        : <span className="text-xs text-slate-500">projected</span>}
+    </div>
+  )
+}

@@ -127,7 +127,7 @@ export default function Activity() {
                 return (
                   <tr key={p.sleeper_id} className={`border-t border-slate-800/80 align-top ${live ? 'bg-emerald-500/5' : ''}`}>
                     <td className="px-3 py-2">
-                      <div className="flex items-center gap-2 font-medium">{p.name}<span className="text-xs text-slate-400">{p.position} · {p.nfl_team}</span>{p.injury_status && <StatusPill p={{ ...p, on_bye: false, projected_points: 0, projection_source: 'none', opponent: null, platform_player_id: p.sleeper_id }} />}</div>
+                      <div className="flex items-center gap-2 font-medium">{p.name}<span className="text-xs text-slate-400">{p.position} · {p.nfl_team}</span>{p.injury_status && <StatusPill p={{ ...p, on_bye: false, projected_points: 0, projection_source: 'none', opponent: null, platform_player_id: p.sleeper_id, actual_points: null, game_state: null }} />}</div>
                       {p.plays[0] && <div className="mt-1 max-w-md text-xs text-slate-400" title={p.plays[0].text}>↳ {p.plays[0].summary ?? p.plays[0].text}</div>}
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 text-xs">

@@ -11,6 +11,8 @@ export interface Player {
   opponent: string | null
   projected_points: number
   projection_source: 'espn' | 'sleeper-exact' | 'sleeper-approx' | 'none'
+  actual_points: number | null
+  game_state: 'pre' | 'in' | 'post' | null
 }
 
 export interface RosterSlot { slot: string; player: Player | null }
@@ -29,6 +31,9 @@ export interface LeagueSummary {
   opponent_name: string | null
   my_projected_total: number | null
   opp_projected_total: number | null
+  my_actual_total: number | null
+  opp_actual_total: number | null
+  in_progress: boolean
   waiver_type: string | null
   faab_remaining: number | null
   waiver_priority: number | null

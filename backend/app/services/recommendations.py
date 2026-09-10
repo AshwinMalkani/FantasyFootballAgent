@@ -47,12 +47,20 @@ def optimize_lineup(roster: list[RosterSlot], lineup_slots: list[str]) -> Lineup
             current.append(RosterSlot(slot=s, player=None))
 
     # IR/TAXI players can't be started without a roster move; everyone else can.
-    pool = [rs.player for rs in roster if rs.player and rs.slot not in ("IR", "TAXI")]
+    # Players whose NFL game has started are locked where they are (the sites won't let you move them).
+    locked = {rs.player.platform_player_id for rs in roster if rs.player and rs.player.game_state in ("in", "post")}
+    pool = [rs.player for rs in roster if rs.player and rs.slot not in ("IR", "TAXI") and rs.player.platform_player_id not in locked]
     used: set[str] = set()
     chosen: dict[int, Player | None] = {}
+    for i, rs in enumerate(current):
+        if rs.player and rs.player.platform_player_id in locked:
+            chosen[i] = rs.player
+            used.add(rs.player.platform_player_id)
     # Fill the most restrictive slots first, then flex slots.
     order = sorted(range(len(slots)), key=lambda i: (len(SLOT_ELIGIBILITY.get(slots[i], {slots[i]})), i))
     for i in order:
+        if i in chosen:
+            continue
         cands = [p for p in pool if p.platform_player_id not in used and _eligible(slots[i], p)]
         best = max(cands, key=effective_points, default=None)
         chosen[i] = best
@@ -74,6 +82,20 @@ def optimize_lineup(roster: list[RosterSlot], lineup_slots: list[str]) -> Lineup
                 free_idxs.append(i)
         for i, p in zip(free_idxs, list(new_players.values())):
             suggested[i] = p
+
+    # Undo pure slot shuffles (e.g. WR <-> FLEX) between players who start either way.
+    changed = True
+    while changed:
+        changed = False
+        for i in range(len(slots)):
+            ci, si = current[i].player, suggested[i]
+            if not ci or not si or ci.platform_player_id == si.platform_player_id:
+                continue
+            j = next((j for j, sj in enumerate(suggested) if sj and sj.platform_player_id == ci.platform_player_id), None)
+            if j is None or not _eligible(slots[j], si) or not _eligible(slots[i], ci):
+                continue
+            suggested[i], suggested[j] = suggested[j], suggested[i]
+            changed = True
 
     # Drop marginal swaps below the noise threshold.
     for i in range(len(slots)):

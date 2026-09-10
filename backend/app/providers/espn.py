@@ -20,10 +20,12 @@ class EspnProvider:
     platform = "espn"
 
     def __init__(self, league_id: int, s2: str, swid: str, team_id: int | None, state: NflState,
-                 db: PlayerDB, projections: dict[str, dict]):
+                 db: PlayerDB, projections: dict[str, dict], live: dict | None = None):
         self.league_id, self.s2, self.swid, self.team_id = league_id, s2, swid, team_id
         self.state, self.db, self.projections = state, db, projections
         self.playing = teams_playing(projections)
+        self.live = (live or {}).get("stats", {})
+        self.board = (live or {}).get("board", {})
         self._league = None
 
     # ---- raw ---------------------------------------------------------
@@ -55,14 +57,14 @@ class EspnProvider:
         raise ProviderError("Could not find your ESPN team", "Set ESPN_TEAM_ID in backend/.env (teamId= in the ESPN URL)")
 
     def _box(self):
-        """(my_box_lineup, my_projected, opp_team, opp_projected)"""
+        """(my_box_lineup, my_projected, opp_team, opp_projected, my_score, opp_score)"""
         lg, me, week = self.league(), self.my_team(), self._week()
         for bs in lg.box_scores(week):
             if getattr(bs.home_team, "team_id", None) == me.team_id:
-                return bs.home_lineup, bs.home_projected, bs.away_team, bs.away_projected
+                return bs.home_lineup, bs.home_projected, bs.away_team, bs.away_projected, bs.home_score, bs.away_score
             if getattr(bs.away_team, "team_id", None) == me.team_id:
-                return bs.away_lineup, bs.away_projected, bs.home_team, bs.home_projected
-        return me.roster, None, None, None
+                return bs.away_lineup, bs.away_projected, bs.home_team, bs.home_projected, bs.away_score, bs.home_score
+        return me.roster, None, None, None, None, None
 
     def _rec_value(self) -> float | None:
         for s in getattr(self.league().settings, "scoring_format", []) or []:
@@ -82,6 +84,7 @@ class EspnProvider:
             self.db, sleeper_id=sid, platform_player_id=str(bp.playerId), name=bp.name, position=pos,
             nfl_team=team, injury_status=status, projections=self.projections, teams_playing=self.playing,
             platform_points=getattr(bp, "projected_points", 0.0) or 0.0,
+            live=self.live, board=self.board, platform_actual=getattr(bp, "points", None),
         )
         if getattr(bp, "on_bye_week", False):
             p.on_bye = True
@@ -107,13 +110,16 @@ class EspnProvider:
 
     def _summary(self) -> LeagueSummary:
         lg, me = self.league(), self.my_team()
-        lineup, my_proj, opp, opp_proj = self._box()
+        lineup, my_proj, opp, opp_proj, my_score, opp_score = self._box()
         st = lg.settings
+        slots = self._roster_slots()
+        started = [rs.player for rs in slots if rs.slot not in BENCH_SLOTS and rs.player and rs.player.game_state in ("in", "post")]
+        in_progress = any(p.game_state == "in" for p in started)
         faab = None
         if getattr(st, "faab", False):
             faab = int(getattr(st, "acquisition_budget", 0) or 0) - int(getattr(me, "acquisition_budget_spent", 0) or 0)
         if my_proj is None:
-            my_proj = round(sum(effective_points(rs.player) for rs in self._roster_slots() if rs.slot not in BENCH_SLOTS), 2)
+            my_proj = round(sum(effective_points(rs.player) for rs in slots if rs.slot not in BENCH_SLOTS), 2)
         return LeagueSummary(
             platform="espn", league_id=str(self.league_id), name=getattr(st, "name", f"ESPN {self.league_id}"),
             season=self.state.season, week=self._week(),
@@ -123,6 +129,9 @@ class EspnProvider:
             opponent_name=getattr(opp, "team_name", None) if opp else None,
             my_projected_total=round(float(my_proj), 2) if my_proj is not None else None,
             opp_projected_total=round(float(opp_proj), 2) if opp_proj is not None else None,
+            my_actual_total=round(float(my_score), 2) if started and my_score is not None else None,
+            opp_actual_total=round(float(opp_score), 2) if started and opp_score is not None else None,
+            in_progress=in_progress,
             waiver_type="FAAB" if faab is not None else "priority", faab_remaining=faab,
             waiver_priority=getattr(me, "waiver_rank", None),
             scoring_label=scoring_label(self._rec_value()),
@@ -132,7 +141,7 @@ class EspnProvider:
     # ---- Provider interface -----------------------------------------
     def list_leagues(self) -> list[LeagueSummary | LeagueError]:
         try:
-            return [cached_model("espn_summary", self._summary, LeagueSummary)]
+            return [cached_model("espn_summary", self._summary, LeagueSummary, ttl=60)]
         except Exception as e:
             return [LeagueError(platform="espn", league_id=str(self.league_id), error=str(e), hint=getattr(e, "hint", HINT))]
 
@@ -146,6 +155,6 @@ class EspnProvider:
         return out
 
 
-def cached_model(key, fn, model):
-    data = cached(key, LEAGUE_TTL, lambda: fn().model_dump())
+def cached_model(key, fn, model, ttl=LEAGUE_TTL):
+    data = cached(key, ttl, lambda: fn().model_dump())
     return model.model_validate(data)

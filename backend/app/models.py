@@ -20,6 +20,8 @@ class Player(BaseModel):
     opponent: str | None = None
     projected_points: float = 0.0
     projection_source: ProjectionSource = "none"
+    actual_points: float | None = None      # None until the player's game has started
+    game_state: Literal["pre", "in", "post"] | None = None
 
 
 class RosterSlot(BaseModel):
@@ -41,6 +43,9 @@ class LeagueSummary(BaseModel):
     opponent_name: str | None = None
     my_projected_total: float | None = None
     opp_projected_total: float | None = None
+    my_actual_total: float | None = None
+    opp_actual_total: float | None = None
+    in_progress: bool = False
     waiver_type: str | None = None
     faab_remaining: int | None = None
     waiver_priority: int | None = None

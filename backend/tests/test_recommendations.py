@@ -91,3 +91,24 @@ def test_moves_reported_as_swaps_not_slot_shuffles():
     assert len(s.moves) == 1
     assert s.moves[0].in_.name == "RB3" and s.moves[0].out.name == "WR3"
     assert s.moves[0].delta == 3.3
+
+
+def test_started_players_are_locked():
+    a = P("1", "RB1", "RB", 5); a.game_state = "post"; a.actual_points = 3.2
+    b = P("2", "RB2", "RB", 14)
+    c = P("3", "RB3", "RB", 12); c.game_state = "in"
+    roster = [RosterSlot(slot="RB", player=a), RosterSlot(slot="BN", player=b), RosterSlot(slot="BN", player=c)]
+    s = optimize_lineup(roster, ["RB", "BN", "BN"])
+    assert s.suggested_starters[0].player.name == "RB1"  # game over: can't swap out
+    assert s.moves == []
+
+
+def test_no_slot_shuffle_between_wr_and_flex():
+    roster = [
+        RosterSlot(slot="WR", player=P("1", "WR1", "WR", 13.3)),
+        RosterSlot(slot="FLEX", player=P("2", "WR2", "WR", 13.7)),
+        RosterSlot(slot="BN", player=P("3", "RB9", "RB", 2)),
+    ]
+    s = optimize_lineup(roster, ["WR", "FLEX", "BN"])
+    assert [rs.player.name for rs in s.suggested_starters] == ["WR1", "WR2"]
+    assert s.moves == []

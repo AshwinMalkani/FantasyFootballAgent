@@ -25,12 +25,14 @@ def _get(path: str, ttl: int = LEAGUE_TTL):
 class SleeperProvider:
     platform = "sleeper"
 
-    def __init__(self, username: str, state: NflState, db: PlayerDB, projections: dict[str, dict]):
+    def __init__(self, username: str, state: NflState, db: PlayerDB, projections: dict[str, dict], live: dict | None = None):
         self.username = username
         self.state = state
         self.db = db
         self.projections = projections
         self.playing = teams_playing(projections)
+        self.live = (live or {}).get("stats", {})
+        self.board = (live or {}).get("board", {})
 
     # ---- raw fetches -------------------------------------------------
     def _user_id(self) -> str:
@@ -52,7 +54,7 @@ class SleeperProvider:
             "league": league,
             "rosters": _get(f"/league/{league_id}/rosters") or [],
             "users": {u["user_id"]: u for u in (_get(f"/league/{league_id}/users") or [])},
-            "matchups": _get(f"/league/{league_id}/matchups/{self.state.week}") or [],
+            "matchups": _get(f"/league/{league_id}/matchups/{self.state.week}", ttl=60) or [],
         }
 
     # ---- helpers -----------------------------------------------------
@@ -62,7 +64,7 @@ class SleeperProvider:
             self.db, sleeper_id=pid, platform_player_id=pid, name=self.db.name(pid),
             position=p.get("position") or "UNK", nfl_team=p.get("team") or (pid if p.get("position") == "DEF" else None),
             injury_status=p.get("injury_status"), projections=self.projections, teams_playing=self.playing,
-            scoring=scoring,
+            scoring=scoring, live=self.live, board=self.board,
         )
 
     @staticmethod
@@ -116,15 +118,22 @@ class SleeperProvider:
         ranked = sorted(rosters, key=key, reverse=True)
         rank = next((i + 1 for i, r in enumerate(ranked) if r["roster_id"] == me["roster_id"]), None)
 
-        opp_name = opp_total = None
+        opp_name = opp_total = my_actual = opp_actual = None
+        my_slots = self._roster_slots(league, me, scoring)
+        started = [rs.player for rs in my_slots if rs.slot not in BENCH_SLOTS and rs.player and rs.player.game_state in ("in", "post")]
+        in_progress = any(p.game_state == "in" for p in started)
         mine = next((m for m in b["matchups"] if m.get("roster_id") == me["roster_id"]), None)
         if mine and mine.get("matchup_id") is not None:
             opp = next((m for m in b["matchups"] if m.get("matchup_id") == mine["matchup_id"] and m["roster_id"] != me["roster_id"]), None)
+            if started:  # Sleeper's own running totals once games have begun
+                my_actual = round(float(mine.get("points") or 0.0), 2)
             if opp:
                 opp_roster = next((r for r in rosters if r["roster_id"] == opp["roster_id"]), None)
                 if opp_roster:
                     opp_name = self._team_name(users, opp_roster)
                     opp_total = self._starter_total(league, opp_roster, scoring)
+                if started:
+                    opp_actual = round(float(opp.get("points") or 0.0), 2)
 
         ls = league.get("settings") or {}
         wtype = {0: "priority", 1: "priority", 2: "FAAB"}.get(ls.get("waiver_type"), None)
@@ -139,6 +148,7 @@ class SleeperProvider:
             rank=rank, total_teams=len(rosters), points_for=round(fpts, 2),
             opponent_name=opp_name,
             my_projected_total=self._starter_total(league, me, scoring), opp_projected_total=opp_total,
+            my_actual_total=my_actual, opp_actual_total=opp_actual, in_progress=in_progress,
             waiver_type=wtype, faab_remaining=faab, waiver_priority=st.get("waiver_position"),
             scoring_label=scoring_label(scoring.get("rec")),
             url=f"https://sleeper.com/leagues/{league['league_id']}",

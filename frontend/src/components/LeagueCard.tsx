@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { api } from '../api'
 import type { LeagueError, LeagueSummary } from '../types'
 import PlatformBadge from './PlatformBadge'
-import { fmt } from './PlayerCell'
+import { Scoreline, fmt } from './PlayerCell'
 
 export function ErrorCard({ e }: { e: LeagueError }) {
   return (
@@ -24,7 +24,6 @@ export default function LeagueCard({ s }: { s: LeagueSummary }) {
   const waivers = useQuery({ queryKey: ['waivers', s.platform, s.league_id], queryFn: () => api.waivers(s.platform, s.league_id) })
   const moves = lineup.data?.moves.length
   const top = waivers.data?.[0]
-  const winning = s.my_projected_total != null && s.opp_projected_total != null && s.my_projected_total >= s.opp_projected_total
 
   return (
     <Link to={`/league/${s.platform}/${s.league_id}`} className="block rounded-xl border border-slate-800 bg-slate-900/70 p-4 transition hover:border-slate-600 hover:bg-slate-900">
@@ -43,11 +42,8 @@ export default function LeagueCard({ s }: { s: LeagueSummary }) {
 
       <div className="mt-3 rounded-lg bg-slate-800/60 p-2 text-sm">
         <div className="text-xs text-slate-400">Week {s.week}{s.opponent_name ? ` vs ${s.opponent_name}` : ''}</div>
-        <div className="mt-0.5 flex items-center gap-2">
-          <span className={`font-semibold ${winning ? 'text-emerald-300' : 'text-slate-200'}`}>{fmt(s.my_projected_total)}</span>
-          <span className="text-slate-500">–</span>
-          <span className={`font-semibold ${!winning && s.opp_projected_total != null ? 'text-red-300' : 'text-slate-200'}`}>{fmt(s.opp_projected_total)}</span>
-          <span className="text-xs text-slate-500">projected</span>
+        <div className="mt-0.5">
+          <Scoreline my={s.my_actual_total} opp={s.opp_actual_total} myProj={s.my_projected_total} oppProj={s.opp_projected_total} live={s.in_progress} />
         </div>
       </div>
 

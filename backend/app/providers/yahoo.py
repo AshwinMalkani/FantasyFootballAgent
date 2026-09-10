@@ -23,10 +23,12 @@ APPROVAL_HINT = ("Yahoo has not approved this app for the Fantasy Sports API yet
 class YahooProvider:
     platform = "yahoo"
 
-    def __init__(self, oauth_path, league_id: str | None, state: NflState, db: PlayerDB, projections: dict[str, dict]):
+    def __init__(self, oauth_path, league_id: str | None, state: NflState, db: PlayerDB, projections: dict[str, dict], live: dict | None = None):
         self.oauth_path, self.league_pref = oauth_path, league_id
         self.state, self.db, self.projections = state, db, projections
         self.playing = teams_playing(projections)
+        self.live = (live or {}).get("stats", {})
+        self.board = (live or {}).get("board", {})
         self._lg = None
         self._tm = None
 
@@ -120,7 +122,7 @@ class YahooProvider:
         pl = build_player(
             self.db, sleeper_id=sid, platform_player_id=str(pid), name=p["name"], position=pos,
             nfl_team=team, injury_status=status, projections=self.projections, teams_playing=self.playing,
-            rec_value=rec_value,
+            rec_value=rec_value, live=self.live, board=self.board,
         )
         try:
             bye = int((d.get("bye_weeks") or {}).get("week", 0))
@@ -148,8 +150,8 @@ class YahooProvider:
             out += [slot] * int(rp.get("count", 1))
         return out
 
-    def _matchup(self) -> tuple[str | None, float | None, float | None]:
-        """(opponent_name, my_projected, opp_projected) from the scoreboard; best-effort."""
+    def _matchup(self) -> tuple[str | None, float | None, float | None, float | None, float | None]:
+        """(opponent_name, my_projected, opp_projected, my_actual, opp_actual) from the scoreboard; best-effort."""
         try:
             lg = self.league()
             raw = cached(f"yahoo_matchups_{lg.league_id}_{self.state.week}", LEAGUE_TTL, lambda: lg.matchups(self.state.week))
@@ -168,15 +170,16 @@ class YahooProvider:
                         if isinstance(item, dict):
                             meta.update(item)
                     proj = t["team"][1].get("team_projected_points", {}).get("total")
-                    parsed.append((meta.get("team_key"), meta.get("name"), float(proj) if proj else None))
+                    pts = t["team"][1].get("team_points", {}).get("total")
+                    parsed.append((meta.get("team_key"), meta.get("name"), float(proj) if proj else None, float(pts) if pts else None))
                 keys = [p[0] for p in parsed]
                 if my_key in keys:
                     me = next(p for p in parsed if p[0] == my_key)
-                    opp = next((p for p in parsed if p[0] != my_key), (None, None, None))
-                    return opp[1], me[2], opp[2]
+                    opp = next((p for p in parsed if p[0] != my_key), (None, None, None, None))
+                    return opp[1], me[2], opp[2], me[3], opp[3]
         except Exception as e:
             log.warning("yahoo matchup parse failed: %s", e)
-        return None, None, None
+        return None, None, None, None, None
 
     def _summary(self) -> LeagueSummary:
         lg, s = self.league(), self._settings()
@@ -184,9 +187,15 @@ class YahooProvider:
         standings = cached(f"yahoo_standings_{lg.league_id}", LEAGUE_TTL, lambda: lg.standings())
         mine = next((t for t in standings if t.get("team_key") == my_key), {})
         ot = mine.get("outcome_totals") or {}
-        opp_name, my_proj, opp_proj = self._matchup()
+        opp_name, my_proj, opp_proj, my_actual, opp_actual = self._matchup()
+        slots = self._roster_slots()
+        started = [rs.player for rs in slots if rs.slot not in BENCH_SLOTS and rs.player and rs.player.game_state in ("in", "post")]
         if my_proj is None:
-            my_proj = round(sum(effective_points(rs.player) for rs in self._roster_slots() if rs.slot not in BENCH_SLOTS), 2)
+            my_proj = round(sum(effective_points(rs.player) for rs in slots if rs.slot not in BENCH_SLOTS), 2)
+        if started and my_actual is None:
+            my_actual = round(sum(rs.player.actual_points or 0.0 for rs in slots if rs.slot not in BENCH_SLOTS and rs.player), 2)
+        if not started:
+            my_actual = opp_actual = None
         teams = cached(f"yahoo_teams_{lg.league_id}", LEAGUE_TTL, lambda: lg.teams())
         me_team = teams.get(my_key, {}) if isinstance(teams, dict) else {}
         uses_faab = str(s.get("uses_faab", "0")) == "1"
@@ -200,6 +209,7 @@ class YahooProvider:
             rank=int(mine["rank"]) if mine.get("rank") else None, total_teams=int(s.get("num_teams", 0)) or None,
             points_for=float(mine["points_for"]) if mine.get("points_for") else None,
             opponent_name=opp_name, my_projected_total=my_proj, opp_projected_total=opp_proj,
+            my_actual_total=my_actual, opp_actual_total=opp_actual, in_progress=any(p.game_state == "in" for p in started),
             waiver_type="FAAB" if uses_faab else "priority",
             faab_remaining=int(faab) if faab not in (None, "") else None,
             waiver_priority=int(me_team["waiver_priority"]) if me_team.get("waiver_priority") else None,
