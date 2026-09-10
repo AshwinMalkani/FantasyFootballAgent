@@ -89,8 +89,14 @@ def plays(event_id: str, limit: int = 150) -> list[dict]:
                     "period": (p.get("period") or {}).get("number"),
                     "team_id": ((p.get("start") or {}).get("team") or {}).get("id"),
                 })
-        out = [p for p in out if p["text"]]
-        return out[-limit:][::-1]
+        # ESPN repeats the in-progress drive in both `previous` and `current`; keep one copy of each play.
+        seen: set = set()
+        deduped = []
+        for p in out:
+            if p["text"] and p["id"] not in seen:
+                seen.add(p["id"])
+                deduped.append(p)
+        return deduped[-limit:][::-1]
 
     return cached(f"plays_{event_id}", 20, fetch)
 

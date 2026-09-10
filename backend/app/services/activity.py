@@ -115,6 +115,7 @@ def build_activity(include_bench: bool = False, season: int | None = None, week:
                 continue
             if not any(abs(lp["delta"]) >= 1.0 for lp in p["league_points"]):  # skip 2-yd runs and the like
                 continue
+            seen_play_ids.add(p["id"])
             events.append({
                 "ts": p.get("wallclock") or datetime.now(timezone.utc).isoformat(), "kind": "play", "play_id": p["id"],
                 "sleeper_id": e["sleeper_id"], "name": e["name"], "summary": p["summary"], "text": p["text"],
