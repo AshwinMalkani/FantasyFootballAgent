@@ -13,7 +13,51 @@ def default_scoring(rec_value: float) -> dict[str, float]:
         "rush_yd": 0.1, "rush_td": 6, "rush_2pt": 2,
         "rec": rec_value, "rec_yd": 0.1, "rec_td": 6, "rec_2pt": 2,
         "fum_lost": -2, "xpm": 1, "fgm_0_19": 3, "fgm_20_29": 3, "fgm_30_39": 3, "fgm_40_49": 4, "fgm_50p": 5,
+        "sack": 1, "int": 2, "fum_rec": 2, "def_td": 6, "safe": 2, "blk_kick": 2, "ff": 1,
     }
+
+
+def team_text_abbrs(team: str | None) -> set[str]:
+    """Abbreviations ESPN play text may use for a team (e.g. BAL appears as BLT)."""
+    if not team:
+        return set()
+    return {team, ESPN_TEXT_ABBR.get(team, team)}
+
+
+def parse_def_play(text: str, def_team: str | None) -> dict | None:
+    """What a DEFENSE did on an opponent's offensive play. Caller must ensure the offense is the other team."""
+    t = _clean(text)
+    up = t.upper()
+    mine = team_text_abbrs(def_team)
+    delta: dict[str, float] = {}
+    bits: list[str] = []
+    turnover = False
+    if "INTERCEPTED" in up:
+        delta["int"] = 1
+        bits.append("interception")
+        turnover = True
+    if "SACKED" in up:
+        delta["sack"] = len(re.findall(r"\bsacked\b", t, re.I))
+        bits.append("sack")
+    if "FUMBLES" in up:
+        rec = re.search(r"RECOVERED by ([A-Z]{2,3})-", t)
+        if rec and rec.group(1) in mine:
+            delta["fum_rec"] = 1
+            delta["ff"] = 1
+            bits.append("fumble recovery")
+            turnover = True
+    if "SAFETY" in up:
+        delta["safe"] = 1
+        bits.append("safety")
+    if re.search(r"\bis BLOCKED\b", t, re.I):
+        delta["blk_kick"] = 1
+        bits.append("blocked kick")
+    if turnover and "TOUCHDOWN" in up:
+        delta["def_td"] = 1
+        bits.append("defensive TD")
+    if not delta:
+        return None
+    return {"summary": ", ".join(bits), "delta": delta}
 
 
 def _yards(sentence: str) -> int | None:

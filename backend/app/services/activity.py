@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from ..models import BENCH_SLOTS, LeagueError
 from ..providers.registry import all_leagues, build_providers, current_state
 from .live import live_stats, play_mentions, play_name_keys, plays, recent_events, record_changes, scoreboard, stat_line
-from .playparse import parse_play, play_points
+from .playparse import parse_def_play, parse_play, play_points
 from .scoring import approx_points, score_stat_line
 
 REC_BY_LABEL = {"PPR": 1.0, "Half PPR": 0.5, "Standard": 0.0}
@@ -95,15 +95,26 @@ def build_activity(include_bench: bool = False, season: int | None = None, week:
 
     for e in players.values():
         g = e.get("game")
-        if not g or g["event_id"] not in game_plays or e["position"] == "DEF":
+        if not g or g["event_id"] not in game_plays:
             continue
-        keys = play_name_keys(e["name"])
-        # Parse every match: the feed filters by point value afterwards, so capping here
-        # would drop an early TD once the player has newer touches.
-        matched = [p for p in game_plays[g["event_id"]] if play_mentions(p["text"], keys)]
+        if e["position"] == "DEF":
+            # Defensive plays: the opponent has the ball, and the play ends badly for them.
+            my_tid = g.get("home_team_id") if g.get("home") == e["nfl_team"] else g.get("away_team_id")
+            matched, parsed_by_id = [], {}
+            for p in game_plays[g["event_id"]]:
+                if not p.get("team_id") or not my_tid or str(p["team_id"]) == str(my_tid):
+                    continue
+                parsed = parse_def_play(p["text"], e["nfl_team"])
+                if parsed:
+                    matched.append(p)
+                    parsed_by_id[p["id"]] = parsed
+        else:
+            keys = play_name_keys(e["name"])
+            matched = [p for p in game_plays[g["event_id"]] if play_mentions(p["text"], keys)]
+            parsed_by_id = {p["id"]: parse_play(p["text"], keys[0], e["nfl_team"]) for p in matched}
         out = []
         for p in matched:
-            parsed = parse_play(p["text"], keys[0], e["nfl_team"])
+            parsed = parsed_by_id.get(p["id"])
             p = dict(p)
             p["summary"] = parsed["summary"] if parsed else None
             p["league_points"] = []

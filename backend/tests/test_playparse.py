@@ -1,4 +1,4 @@
-from app.services.playparse import default_scoring, parse_play, play_points
+from app.services.playparse import default_scoring, parse_def_play, parse_play, play_points
 
 
 def test_rushing_td_with_missed_xp_by_someone_else():
@@ -52,3 +52,19 @@ def test_leading_parentheticals_are_stripped():
     # A tackler parenthetical still gets removed mid-sentence, not treated as a leading tag.
     f = parse_play("(No Huddle) S.Barkley right guard to PHI 40 for 3 yards (M.Humphrey).", "S.Barkley", "PHI")
     assert f["delta"] == {"rush_att": 1, "rush_yd": 3}
+
+
+def test_defensive_plays():
+    pick = "(Shotgun) D.Maye pass deep right intended for S.Diggs INTERCEPTED by D.Witherspoon at SEA 12. D.Witherspoon to SEA 30 for 18 yards (H.Henry)."
+    r = parse_def_play(pick, "SEA")
+    assert r["summary"] == "interception" and r["delta"] == {"int": 1}
+    assert play_points(r["delta"], None, 1.0) == 2
+    six = "D.Maye pass short left INTERCEPTED by D.Witherspoon at SEA 40. D.Witherspoon for 60 yards, TOUCHDOWN."
+    assert parse_def_play(six, "SEA")["delta"] == {"int": 1, "def_td": 1}
+    sack = "(Shotgun) D.Maye sacked at NE 20 for -8 yards (L.Williams)."
+    assert parse_def_play(sack, "SEA")["delta"] == {"sack": 1}
+    fum = "R.Stevenson right guard to NE 30 for 2 yards. R.Stevenson FUMBLES, RECOVERED by SEA-J.Reed at NE 31."
+    assert parse_def_play(fum, "SEA")["delta"] == {"fum_rec": 1, "ff": 1}
+    # Offense recovered its own fumble: nothing for the defense.
+    assert parse_def_play("R.Stevenson FUMBLES, RECOVERED by NE-D.Maye at NE 28.", "SEA") is None
+    assert parse_def_play("D.Maye pass short right to H.Henry for 6 yards.", "SEA") is None
