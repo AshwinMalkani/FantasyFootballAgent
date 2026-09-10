@@ -105,10 +105,14 @@ class YahooProvider:
     @staticmethod
     def _position(p: dict) -> str:
         elig = p.get("eligible_positions") or []
+        primary = p.get("primary_position")
+        # A WR who is also RB-eligible is a WR: trust Yahoo's primary before the elig order.
+        if primary in PRIMARY:
+            return primary
         for pos in PRIMARY:
             if pos in elig:
                 return pos
-        return p.get("primary_position") or (elig[0] if elig else "UNK")
+        return primary or (elig[0] if elig else "UNK")
 
     def _player(self, p: dict, details: dict[int, dict], rec_value: float | None) -> Player:
         pid = int(p["player_id"])
@@ -192,9 +196,15 @@ class YahooProvider:
         started = [rs.player for rs in slots if rs.slot not in BENCH_SLOTS and rs.player and rs.player.game_state in ("in", "post")]
         if my_proj is None:
             my_proj = round(sum(effective_points(rs.player) for rs in slots if rs.slot not in BENCH_SLOTS), 2)
-        if started and my_actual is None:
-            my_actual = round(sum(rs.player.actual_points or 0.0 for rs in slots if rs.slot not in BENCH_SLOTS and rs.player), 2)
-        if not started:
+        # We can't see the opponent's roster cheaply, so points on the scoreboard stand in
+        # for "their side has started". Either side starting makes it a live matchup.
+        any_started = bool(started) or bool(opp_actual)
+        if any_started:
+            if my_actual is None:
+                my_actual = round(sum(rs.player.actual_points or 0.0 for rs in slots if rs.slot not in BENCH_SLOTS and rs.player), 2)
+            if opp_actual is None:
+                opp_actual = 0.0
+        else:
             my_actual = opp_actual = None
         teams = cached(f"yahoo_teams_{lg.league_id}", LEAGUE_TTL, lambda: lg.teams())
         me_team = teams.get(my_key, {}) if isinstance(teams, dict) else {}

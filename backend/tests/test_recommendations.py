@@ -112,3 +112,47 @@ def test_no_slot_shuffle_between_wr_and_flex():
     s = optimize_lineup(roster, ["WR", "FLEX", "BN"])
     assert [rs.player.name for rs in s.suggested_starters] == ["WR1", "WR2"]
     assert s.moves == []
+
+
+def test_effective_points_uses_actual_once_the_game_starts():
+    from app.services.recommendations import effective_points
+    pre = P("1", "RB1", "RB", 12.0)
+    assert effective_points(pre) == 12.0
+    done = P("2", "RB2", "RB", 12.0); done.game_state = "post"; done.actual_points = 3.4
+    assert effective_points(done) == 3.4
+    dnp = P("3", "RB3", "RB", 12.0); dnp.game_state = "post"
+    assert effective_points(dnp) == 0.0          # game over, never played
+    playing = P("4", "RB4", "RB", 12.0); playing.game_state = "in"; playing.actual_points = 2.0
+    assert effective_points(playing) == 2.0
+    kickoff = P("5", "RB5", "RB", 12.0); kickoff.game_state = "in"
+    assert effective_points(kickoff) == 12.0     # no stats yet: keep the projection
+    # An "Out" (or bye) tag must not wipe points a player actually scored.
+    surprise = P("6", "RB6", "RB", 0.0, injury="Out"); surprise.game_state = "post"; surprise.actual_points = 14.2
+    assert effective_points(surprise) == 14.2
+    benched = P("7", "RB7", "RB", 11.0, injury="Out")
+    assert effective_points(benched) == 0.0
+
+
+def test_lineup_total_counts_finished_games_not_projections():
+    roster = [
+        RosterSlot(slot="RB", player=P("1", "RB1", "RB", 15.0)),
+        RosterSlot(slot="BN", player=P("2", "RB2", "RB", 9.0)),
+    ]
+    roster[0].player.game_state = "post"
+    roster[0].player.actual_points = 21.5
+    s = optimize_lineup(roster, ["RB", "BN"])
+    assert s.current_total == 21.5 and s.suggested_total == 21.5
+    assert s.moves == []  # RB1's game is over; he is locked in
+
+
+def test_waivers_never_suggest_dropping_a_player_mid_game():
+    playing = P("9", "RB3", "RB", 4); playing.game_state = "in"
+    finished = P("11", "TE2", "TE", 3); finished.game_state = "post"; finished.actual_points = 1.0
+    roster = [
+        RosterSlot(slot="RB", player=P("2", "RB1", "RB", 15)),
+        RosterSlot(slot="BN", player=playing),
+        RosterSlot(slot="BN", player=finished),
+    ]
+    t = rank_waivers([P("100", "FA RB", "RB", 9)], roster, trending={}, lineup_slots=["RB", "FLEX", "BN", "BN"])
+    drop = t[0].suggested_drop
+    assert drop is not None and drop.name == "TE2"  # RB3 is playing right now; TE2 is done

@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api'
-import type { NewsItem } from '../types'
+import type { NewsItem, NewsLeague, NewsPlayer } from '../types'
 
 function ago(iso: string | null): string {
   if (!iso) return ''
@@ -20,17 +20,40 @@ const TYPE_STYLE: Record<string, string> = {
 }
 const PLATFORM_TEXT = { sleeper: 'text-indigo-300', espn: 'text-red-300', yahoo: 'text-purple-300' } as const
 
+function LeagueChips({ leagues }: { leagues: NewsLeague[] }) {
+  return (
+    <div className="flex flex-wrap gap-1">
+      {leagues.map((l) => (
+        <Link key={`${l.platform}-${l.league_id}`} to={`/league/${l.platform}/${l.league_id}`}
+          className={`rounded-md bg-slate-800 px-1.5 py-0.5 text-[11px] ring-1 ring-slate-700 ${l.is_starter ? '' : 'text-slate-500'}`}>
+          <span className={PLATFORM_TEXT[l.platform]}>{l.league_name}</span> <span className="text-slate-500">{l.slot}</span>
+        </Link>
+      ))}
+    </div>
+  )
+}
+
+function PlayerLine({ p }: { p: NewsPlayer }) {
+  const bad = ['OUT', 'IR', 'DOUBTFUL', 'SUS', 'PUP'].includes((p.injury_status || '').toUpperCase())
+  return (
+    <>
+      <span className="font-semibold">{p.name}</span>
+      <span className="text-xs text-slate-400">{p.position} · {p.nfl_team ?? 'FA'}</span>
+      {p.injury_status && <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${bad ? 'bg-red-500/20 text-red-300' : 'bg-amber-500/20 text-amber-300'}`}>{p.injury_status}</span>}
+    </>
+  )
+}
+
 function Item({ n }: { n: NewsItem }) {
   const [open, setOpen] = useState(false)
   const body = n.story || n.description
   const long = body.length > 220
-  const bad = ['OUT', 'IR', 'DOUBTFUL', 'SUS', 'PUP'].includes((n.player.injury_status || '').toUpperCase())
+  const players = n.players?.length ? n.players : [{ ...n.player, leagues: n.leagues }]
   return (
     <li className="rounded-xl border border-slate-800 bg-slate-900/50 p-4">
       <div className="flex flex-wrap items-center gap-2 text-sm">
-        <span className="font-semibold">{n.player.name}</span>
-        <span className="text-xs text-slate-400">{n.player.position} · {n.player.nfl_team ?? 'FA'}</span>
-        {n.player.injury_status && <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${bad ? 'bg-red-500/20 text-red-300' : 'bg-amber-500/20 text-amber-300'}`}>{n.player.injury_status}</span>}
+        <PlayerLine p={players[0]} />
+        {players.length > 1 && <span className="text-xs text-slate-500">+{players.length - 1} more</span>}
         <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${TYPE_STYLE[n.type] ?? 'bg-slate-700 text-slate-300'}`}>{n.type === 'Rotowire' ? 'Player note' : n.type}</span>
         <span className="ml-auto text-xs text-slate-500">{ago(n.published)}</span>
       </div>
@@ -41,12 +64,13 @@ function Item({ n }: { n: NewsItem }) {
           {long && <button onClick={() => setOpen(!open)} className="ml-2 text-xs text-blue-300 hover:underline">{open ? 'less' : 'more'}</button>}
         </p>
       )}
-      <div className="mt-2 flex flex-wrap gap-1">
-        {n.leagues.map((l) => (
-          <Link key={`${l.platform}-${l.league_id}`} to={`/league/${l.platform}/${l.league_id}`}
-            className={`rounded-md bg-slate-800 px-1.5 py-0.5 text-[11px] ring-1 ring-slate-700 ${l.is_starter ? '' : 'text-slate-500'}`}>
-            <span className={PLATFORM_TEXT[l.platform]}>{l.league_name}</span> <span className="text-slate-500">{l.slot}</span>
-          </Link>
+      <div className="mt-2 space-y-1.5">
+        {players.map((p, i) => (
+          <div key={p.espn_id} className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            {/* The first player is already named in the header; the rest get their own line. */}
+            {i > 0 && <span className="flex items-center gap-2 text-xs"><PlayerLine p={p} /></span>}
+            <LeagueChips leagues={p.leagues} />
+          </div>
         ))}
       </div>
     </li>
@@ -64,7 +88,8 @@ export default function NewsPage() {
     const list = q.data?.items ?? []
     const s = search.trim().toLowerCase()
     return list.filter((n) => (type === 'all' || (type === 'Story' ? n.type !== 'Rotowire' : n.type === type))
-      && (!s || n.player.name.toLowerCase().includes(s) || n.headline.toLowerCase().includes(s)))
+      && (!s || n.headline.toLowerCase().includes(s)
+        || (n.players ?? [n.player]).some((p) => p.name.toLowerCase().includes(s))))
   }, [q.data, type, search])
 
   return (
@@ -96,7 +121,7 @@ export default function NewsPage() {
           </p>
           {items.length === 0
             ? <p className="mt-6 text-slate-500">Nothing in this window.</p>
-            : <ul className="mt-4 grid gap-3 lg:grid-cols-2">{items.map((n) => <Item key={`${n.id}-${n.player.espn_id}`} n={n} />)}</ul>}
+            : <ul className="mt-4 grid gap-3 lg:grid-cols-2">{items.map((n) => <Item key={n.id} n={n} />)}</ul>}
         </>
       )}
     </div>

@@ -17,7 +17,18 @@ MIN_MOVE_DELTA = 0.5
 
 
 def effective_points(p: Player | None) -> float:
-    if p is None or p.on_bye:
+    """What this player is worth to a lineup total right now.
+
+    Once his game has started the scoreboard beats any projection (and beats an
+    'Out' tag: a player listed Out who still played keeps the points he scored).
+    """
+    if p is None:
+        return 0.0
+    if p.game_state == "post":
+        return p.actual_points or 0.0
+    if p.game_state == "in":
+        return p.actual_points if p.actual_points is not None else p.projected_points
+    if p.on_bye:
         return 0.0
     if (p.injury_status or "").upper() in ZERO_STATUSES:
         return 0.0
@@ -157,7 +168,8 @@ def rank_waivers(
     lineup_slots: list[str] | None = None,
 ) -> list[WaiverTarget]:
     bench = [rs.player for rs in roster if rs.slot == "BN" and rs.player]
-    droppable = [p for p in bench if not p.on_bye]
+    # A player whose game is in progress is locked: the sites won't let you drop him.
+    droppable = [p for p in bench if not p.on_bye and p.game_state != "in"]
     base_total = optimize_lineup(roster, lineup_slots).suggested_total if lineup_slots else None
     # Depth (bench) value matters less at positions you rarely start more than one of.
     slots = starting_slots(lineup_slots or [])

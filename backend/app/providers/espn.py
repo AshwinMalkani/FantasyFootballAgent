@@ -1,7 +1,7 @@
 from ..cache import cached
 from ..models import BENCH_SLOTS, LeagueDetail, LeagueError, LeagueSummary, NflState, Player, RosterSlot
 from ..services.enrich import build_player
-from ..services.players import PlayerDB
+from ..services.players import PlayerDB, norm_team
 from ..services.projections import teams_playing
 from ..services.recommendations import effective_points
 from ..services.scoring import scoring_label
@@ -57,14 +57,25 @@ class EspnProvider:
         raise ProviderError("Could not find your ESPN team", "Set ESPN_TEAM_ID in backend/.env (teamId= in the ESPN URL)")
 
     def _box(self):
-        """(my_box_lineup, my_projected, opp_team, opp_projected, my_score, opp_score)"""
+        """(my_box_lineup, my_projected, opp_team, opp_projected, my_score, opp_score, opp_box_lineup)"""
         lg, me, week = self.league(), self.my_team(), self._week()
         for bs in lg.box_scores(week):
             if getattr(bs.home_team, "team_id", None) == me.team_id:
-                return bs.home_lineup, bs.home_projected, bs.away_team, bs.away_projected, bs.home_score, bs.away_score
+                return bs.home_lineup, bs.home_projected, bs.away_team, bs.away_projected, bs.home_score, bs.away_score, bs.away_lineup
             if getattr(bs.away_team, "team_id", None) == me.team_id:
-                return bs.away_lineup, bs.away_projected, bs.home_team, bs.home_projected, bs.away_score, bs.home_score
-        return me.roster, None, None, None, None, None
+                return bs.away_lineup, bs.away_projected, bs.home_team, bs.home_projected, bs.away_score, bs.home_score, bs.home_lineup
+        return me.roster, None, None, None, None, None, []
+
+    def _lineup_states(self, lineup) -> list[str | None]:
+        """game_state of each *starter* in a box lineup, straight off the scoreboard."""
+        out = []
+        for bp in lineup or []:
+            raw = getattr(bp, "slot_position", None) or getattr(bp, "lineupSlot", "BE")
+            if SLOT_MAP.get(raw, raw) in BENCH_SLOTS:
+                continue
+            team = norm_team(getattr(bp, "proTeam", None))
+            out.append((self.board.get(team) or {}).get("state") if team else None)
+        return out
 
     def _rec_value(self) -> float | None:
         for s in getattr(self.league().settings, "scoring_format", []) or []:
@@ -110,11 +121,14 @@ class EspnProvider:
 
     def _summary(self) -> LeagueSummary:
         lg, me = self.league(), self.my_team()
-        lineup, my_proj, opp, opp_proj, my_score, opp_score = self._box()
+        lineup, my_proj, opp, opp_proj, my_score, opp_score, opp_lineup = self._box()
         st = lg.settings
         slots = self._roster_slots()
         started = [rs.player for rs in slots if rs.slot not in BENCH_SLOTS and rs.player and rs.player.game_state in ("in", "post")]
-        in_progress = any(p.game_state == "in" for p in started)
+        opp_states = self._lineup_states(opp_lineup)
+        # Either side kicking off makes the matchup live; the other side then shows 0.0, not "–".
+        any_started = bool(started) or any(s in ("in", "post") for s in opp_states)
+        in_progress = any(p.game_state == "in" for p in started) or "in" in opp_states
         faab = None
         if getattr(st, "faab", False):
             faab = int(getattr(st, "acquisition_budget", 0) or 0) - int(getattr(me, "acquisition_budget_spent", 0) or 0)
@@ -129,8 +143,8 @@ class EspnProvider:
             opponent_name=getattr(opp, "team_name", None) if opp else None,
             my_projected_total=round(float(my_proj), 2) if my_proj is not None else None,
             opp_projected_total=round(float(opp_proj), 2) if opp_proj is not None else None,
-            my_actual_total=round(float(my_score), 2) if started and my_score is not None else None,
-            opp_actual_total=round(float(opp_score), 2) if started and opp_score is not None else None,
+            my_actual_total=round(float(my_score or 0.0), 2) if any_started else None,
+            opp_actual_total=round(float(opp_score or 0.0), 2) if any_started and opp is not None else None,
             in_progress=in_progress,
             waiver_type="FAAB" if faab is not None else "priority", faab_remaining=faab,
             waiver_priority=getattr(me, "waiver_rank", None),

@@ -35,8 +35,13 @@ def _fg_bucket(dist: int) -> str:
     return "fgm_50p"
 
 
+# Formation / clock tags ESPN puts in front of a play or of a sentence inside it:
+# "(Shotgun)", "(No Huddle, Shotgun)", "(4:12)", "(Field Goal formation)", ...
+_LEAD_TAGS = re.compile(r"(^|[.!]\s+)(?:\([^)]*\)\s*)+")
+
+
 def _clean(text: str) -> str:
-    t = re.sub(r"\((?:Shotgun|No Huddle|No Huddle, Shotgun|Punt formation|Field Goal formation|Kick formation)\)\s*", "", text)
+    t = _LEAD_TAGS.sub(r"\1", text)
     t = re.sub(r"\s*\([A-Z]\.[^)]*\)", "", t)  # tacklers: "(G.Rousseau)"
     t = re.sub(r",?\s*Center-[^.]*", "", t)     # snap/hold credits on kicks
     return t.strip()

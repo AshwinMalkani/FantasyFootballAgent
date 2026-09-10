@@ -84,17 +84,19 @@ def build_news(days: int = 10, include_bench: bool = True) -> dict:
     with ThreadPoolExecutor(max_workers=8) as ex:
         feeds = dict(zip(players.keys(), ex.map(lambda k: _safe(players[k]["espn_id"], days), players.keys())))
 
-    items: list[dict] = []
-    seen: set[tuple[str, str]] = set()
+    # One ESPN story often tags several of my players; show it once, listing them all.
+    by_id: dict[str, dict] = {}
     for k, e in players.items():
+        who = {kk: e[kk] for kk in ("espn_id", "sleeper_id", "name", "position", "nfl_team", "injury_status")}
         for n in feeds.get(k, []):
-            key = (n["id"], k)
-            if key in seen:
-                continue
-            seen.add(key)
-            items.append({**n, "player": {kk: e[kk] for kk in ("espn_id", "sleeper_id", "name", "position", "nfl_team", "injury_status")},
-                          "leagues": e["leagues"]})
-    items.sort(key=lambda n: n.get("published") or "", reverse=True)
+            item = by_id.get(n["id"])
+            if item is None:
+                # `player` / `leagues` stay as the first player, for older clients.
+                by_id[n["id"]] = {**n, "player": who, "leagues": list(e["leagues"]),
+                                  "players": [{**who, "leagues": e["leagues"]}]}
+            elif not any(x["espn_id"] == who["espn_id"] for x in item["players"]):
+                item["players"].append({**who, "leagues": e["leagues"]})
+    items = sorted(by_id.values(), key=lambda n: n.get("published") or "", reverse=True)
     return {"days": days, "players": len(players), "unmapped": unmapped, "items": items}
 
 

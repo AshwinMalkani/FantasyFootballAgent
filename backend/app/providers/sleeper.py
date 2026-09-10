@@ -99,10 +99,18 @@ class SleeperProvider:
                 slots.append(RosterSlot(slot="BN", player=self._player(pid, scoring)))
         return slots
 
-    def _starter_total(self, league: dict, roster: dict, scoring: dict) -> float:
+    @staticmethod
+    def _slots_total(slots: list[RosterSlot]) -> float:
         from ..services.recommendations import effective_points
-        return round(sum(effective_points(rs.player) for rs in self._roster_slots(league, roster, scoring)
-                         if rs.slot not in BENCH_SLOTS), 2)
+        return round(sum(effective_points(rs.player) for rs in slots if rs.slot not in BENCH_SLOTS), 2)
+
+    @staticmethod
+    def _started(slots: list[RosterSlot]) -> list[Player]:
+        return [rs.player for rs in slots
+                if rs.slot not in BENCH_SLOTS and rs.player and rs.player.game_state in ("in", "post")]
+
+    def _starter_total(self, league: dict, roster: dict, scoring: dict) -> float:
+        return self._slots_total(self._roster_slots(league, roster, scoring))
 
     def _summary(self, b: dict) -> LeagueSummary:
         league, rosters, users = b["league"], b["rosters"], b["users"]
@@ -120,20 +128,25 @@ class SleeperProvider:
 
         opp_name = opp_total = my_actual = opp_actual = None
         my_slots = self._roster_slots(league, me, scoring)
-        started = [rs.player for rs in my_slots if rs.slot not in BENCH_SLOTS and rs.player and rs.player.game_state in ("in", "post")]
-        in_progress = any(p.game_state == "in" for p in started)
+        started = self._started(my_slots)
+        opp_started: list[Player] = []
         mine = next((m for m in b["matchups"] if m.get("roster_id") == me["roster_id"]), None)
         if mine and mine.get("matchup_id") is not None:
             opp = next((m for m in b["matchups"] if m.get("matchup_id") == mine["matchup_id"] and m["roster_id"] != me["roster_id"]), None)
-            if started:  # Sleeper's own running totals once games have begun
-                my_actual = round(float(mine.get("points") or 0.0), 2)
             if opp:
                 opp_roster = next((r for r in rosters if r["roster_id"] == opp["roster_id"]), None)
                 if opp_roster:
+                    opp_slots = self._roster_slots(league, opp_roster, scoring)
+                    opp_started = self._started(opp_slots)
                     opp_name = self._team_name(users, opp_roster)
-                    opp_total = self._starter_total(league, opp_roster, scoring)
-                if started:
+                    opp_total = self._slots_total(opp_slots)
+            # Sleeper's own running totals, once either side has kicked off. The side that
+            # hasn't started yet shows 0.0 (not None) so the card renders a live scoreline.
+            if started or opp_started:
+                my_actual = round(float(mine.get("points") or 0.0), 2)
+                if opp:
                     opp_actual = round(float(opp.get("points") or 0.0), 2)
+        in_progress = any(p.game_state == "in" for p in started + opp_started)
 
         ls = league.get("settings") or {}
         wtype = {0: "priority", 1: "priority", 2: "FAAB"}.get(ls.get("waiver_type"), None)
@@ -147,7 +160,7 @@ class SleeperProvider:
             record=f"{st.get('wins', 0)}-{st.get('losses', 0)}" + (f"-{st['ties']}" if st.get("ties") else ""),
             rank=rank, total_teams=len(rosters), points_for=round(fpts, 2),
             opponent_name=opp_name,
-            my_projected_total=self._starter_total(league, me, scoring), opp_projected_total=opp_total,
+            my_projected_total=self._slots_total(my_slots), opp_projected_total=opp_total,
             my_actual_total=my_actual, opp_actual_total=opp_actual, in_progress=in_progress,
             waiver_type=wtype, faab_remaining=faab, waiver_priority=st.get("waiver_position"),
             scoring_label=scoring_label(scoring.get("rec")),

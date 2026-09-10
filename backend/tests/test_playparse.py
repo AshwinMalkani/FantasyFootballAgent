@@ -39,3 +39,16 @@ def test_fumble_lost_and_interception():
     i = parse_play("J.Allen pass deep left intended for K.Coleman INTERCEPTED by M.Humphrey at BLT 20.", "J.Allen", "BUF")
     assert i["delta"] == {"pass_int": 1}
     assert parse_play("J.Allen pass deep left intended for K.Coleman INTERCEPTED by M.Humphrey at BLT 20.", "K.Coleman", "BUF") is None
+
+
+def test_leading_parentheticals_are_stripped():
+    r = parse_play("(Shotgun, No Huddle) D.Henry left end for 5 yards.", "D.Henry", "BAL")
+    assert r["summary"] == "5-yd rush" and r["delta"] == {"rush_att": 1, "rush_yd": 5}
+    # Clock/formation tags stack, and reappear at the start of later sentences.
+    t = ("(12:04) (Shotgun) J.Allen pass short right to J.Cook for 8 yards, TOUCHDOWN. "
+         "(Pass formation) TWO-POINT CONVERSION ATTEMPT. J.Allen rushes right end. ATTEMPT SUCCEEDS.")
+    assert parse_play(t, "J.Cook", "BUF")["delta"] == {"rec": 1, "rec_yd": 8, "rec_td": 1}
+    assert parse_play(t, "J.Allen", "BUF")["delta"] == {"pass_yd": 8, "pass_td": 1, "rush_2pt": 1}
+    # A tackler parenthetical still gets removed mid-sentence, not treated as a leading tag.
+    f = parse_play("(No Huddle) S.Barkley right guard to PHI 40 for 3 yards (M.Humphrey).", "S.Barkley", "PHI")
+    assert f["delta"] == {"rush_att": 1, "rush_yd": 3}

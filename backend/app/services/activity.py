@@ -12,7 +12,13 @@ from .scoring import approx_points, score_stat_line
 REC_BY_LABEL = {"PPR": 1.0, "Half PPR": 0.5, "Standard": 0.0}
 
 
-def _league_points(platform: str, scoring: dict, label: str | None, stats: dict) -> float:
+TABLE_PLAYS = 8  # the table only renders plays[0]; the feed uses the full list
+
+
+def _league_points(platform: str, scoring: dict, label: str | None, stats: dict, actual: float | None = None) -> float:
+    """The league's own number when we have it (ESPN's real total, Sleeper's exact score)."""
+    if actual is not None:
+        return actual
     if platform == "sleeper" and scoring:
         return score_stat_line(stats, scoring)
     return approx_points(stats, REC_BY_LABEL.get(label or "", 0.5))
@@ -23,6 +29,9 @@ def build_activity(include_bench: bool = False, season: int | None = None, week:
     state = current_state()
     season = season or state.season
     week = week or state.week
+    # Replay mode (a past season/week): the rosters' own actuals and the change tracker
+    # both belong to the live week, so neither may be used here.
+    is_current = season == state.season and week == state.week
     providers = build_providers()
     summaries = [s for s in all_leagues() if not isinstance(s, LeagueError)]
 
@@ -63,7 +72,8 @@ def build_activity(include_bench: bool = False, season: int | None = None, week:
             entry["leagues"].append({
                 "league_key": league_key, "platform": s.platform, "league_id": s.league_id, "league_name": s.name,
                 "slot": rs.slot, "is_starter": is_starter,
-                "points": _league_points(s.platform, d.scoring, s.scoring_label, st) if st else 0.0,
+                "points": _league_points(s.platform, d.scoring, s.scoring_label, st,
+                                        p.actual_points if is_current else None),
                 "projected": p.projected_points,
             })
             if live:
@@ -88,7 +98,9 @@ def build_activity(include_bench: bool = False, season: int | None = None, week:
         if not g or g["event_id"] not in game_plays or e["position"] == "DEF":
             continue
         keys = play_name_keys(e["name"])
-        matched = [p for p in game_plays[g["event_id"]] if play_mentions(p["text"], keys)][:8]
+        # Parse every match: the feed filters by point value afterwards, so capping here
+        # would drop an early TD once the player has newer touches.
+        matched = [p for p in game_plays[g["event_id"]] if play_mentions(p["text"], keys)]
         out = []
         for p in matched:
             parsed = parse_play(p["text"], keys[0], e["nfl_team"])
@@ -104,10 +116,13 @@ def build_activity(include_bench: bool = False, season: int | None = None, week:
         e["plays"] = out
 
     # Feed: stat changes since the last poll + scoring plays involving my players.
-    for e in players.values():
-        if e["stats"]:
-            record_changes(e["sleeper_id"], e["name"], e["stats"], e["leagues"])
-    events = recent_events()
+    # A replay of a past week must not touch (or read) the live baseline.
+    events: list[dict] = []
+    if is_current:
+        for e in players.values():
+            if e["stats"]:
+                record_changes(e["sleeper_id"], e["name"], e["stats"], e["leagues"])
+        events = recent_events()
     seen_play_ids = {ev.get("play_id") for ev in events}
     for e in players.values():
         for p in e["plays"]:
@@ -122,6 +137,10 @@ def build_activity(include_bench: bool = False, season: int | None = None, week:
                 "stat_diff": [], "league_deltas": p["league_points"],
             })
     events.sort(key=lambda ev: ev["ts"], reverse=True)
+
+    # The client only shows the newest play per player; keep the payload small.
+    for e in players.values():
+        e["plays"] = e["plays"][:TABLE_PLAYS]
 
     def sort_key(e):
         g = e.get("game") or {}
