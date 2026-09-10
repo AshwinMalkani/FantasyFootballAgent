@@ -154,6 +154,47 @@ class YahooProvider:
             out += [slot] * int(rp.get("count", 1))
         return out
 
+    def _opponent_key(self) -> str | None:
+        try:
+            lg = self.league()
+            raw = cached(f"yahoo_matchups_{lg.league_id}_{self.state.week}", LEAGUE_TTL, lambda: lg.matchups(self.state.week))
+            my_key = lg.team_key()
+            matchups = raw["fantasy_content"]["league"][1]["scoreboard"]["0"]["matchups"]
+            for k, m in matchups.items():
+                if k == "count":
+                    continue
+                keys = []
+                for tk, t in m["matchup"]["0"]["teams"].items():
+                    if tk == "count":
+                        continue
+                    for item in t["team"][0]:
+                        if isinstance(item, dict) and "team_key" in item:
+                            keys.append(item["team_key"])
+                if my_key in keys:
+                    return next((k2 for k2 in keys if k2 != my_key), None)
+        except Exception as e:
+            log.warning("yahoo opponent lookup failed: %s", e)
+        return None
+
+    def _opponent_roster_slots(self) -> list[RosterSlot] | None:
+        key = self._opponent_key()
+        if not key:
+            return None
+        try:
+            lg = self.league()
+            raw = cached(f"yahoo_roster_{lg.league_id}_{key}_{self.state.week}", LEAGUE_TTL,
+                         lambda: lg.to_team(key).roster(self.state.week))
+            details = self._details([int(p["player_id"]) for p in raw])
+            rec = self._rec_value()
+            slots = [RosterSlot(slot=SLOT_MAP.get(p.get("selected_position"), p.get("selected_position") or "BN"),
+                                player=self._player(p, details, rec)) for p in raw]
+            order = {s: i for i, s in enumerate(self._lineup_slots())}
+            slots.sort(key=lambda rs: order.get(rs.slot, 99))
+            return slots
+        except Exception as e:
+            log.warning("yahoo opponent roster failed: %s", e)
+            return None
+
     def _matchup(self) -> tuple[str | None, float | None, float | None, float | None, float | None]:
         """(opponent_name, my_projected, opp_projected, my_actual, opp_actual) from the scoreboard; best-effort."""
         try:
@@ -235,7 +276,8 @@ class YahooProvider:
             return [LeagueError(platform="yahoo", league_id=self.league_pref, error=str(e), hint=getattr(e, "hint", HINT))]
 
     def detail(self, league_id: str) -> LeagueDetail:
-        return LeagueDetail(summary=self._summary(), roster=self._roster_slots(), lineup_slots=self._lineup_slots(), scoring={})
+        return LeagueDetail(summary=self._summary(), roster=self._roster_slots(), lineup_slots=self._lineup_slots(), scoring={},
+                            opponent_roster=self._opponent_roster_slots())
 
     def free_agents(self, league_id: str) -> list[Player]:
         lg = self.league()

@@ -178,15 +178,26 @@ class SleeperProvider:
                                        error=str(e), hint=getattr(e, "hint", None)))
         return out
 
+    def _opponent_roster(self, b: dict, me: dict) -> dict | None:
+        mine = next((m for m in b["matchups"] if m.get("roster_id") == me["roster_id"]), None)
+        if not mine or mine.get("matchup_id") is None:
+            return None
+        opp = next((m for m in b["matchups"] if m.get("matchup_id") == mine["matchup_id"] and m["roster_id"] != me["roster_id"]), None)
+        if not opp:
+            return None
+        return next((r for r in b["rosters"] if r["roster_id"] == opp["roster_id"]), None)
+
     def detail(self, league_id: str) -> LeagueDetail:
         b = self._bundle(league_id)
         scoring = b["league"].get("scoring_settings") or {}
         me = self._my_roster(b)
+        opp = self._opponent_roster(b, me)
         return LeagueDetail(
             summary=self._summary(b),
             roster=self._roster_slots(b["league"], me, scoring),
             lineup_slots=b["league"].get("roster_positions") or [],
             scoring=scoring,
+            opponent_roster=self._roster_slots(b["league"], opp, scoring) if opp else None,
         )
 
     def free_agents(self, league_id: str) -> list[Player]:

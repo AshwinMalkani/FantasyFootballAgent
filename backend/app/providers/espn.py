@@ -101,8 +101,9 @@ class EspnProvider:
             p.on_bye = True
         return p
 
-    def _roster_slots(self) -> list[RosterSlot]:
-        lineup, *_ = self._box()
+    def _roster_slots(self, lineup=None) -> list[RosterSlot]:
+        if lineup is None:
+            lineup, *_ = self._box()
         slots = []
         for bp in lineup:
             raw = getattr(bp, "slot_position", None) or getattr(bp, "lineupSlot", "BE")
@@ -160,7 +161,11 @@ class EspnProvider:
             return [LeagueError(platform="espn", league_id=str(self.league_id), error=str(e), hint=getattr(e, "hint", HINT))]
 
     def detail(self, league_id: str) -> LeagueDetail:
-        return LeagueDetail(summary=self._summary(), roster=self._roster_slots(), lineup_slots=self._lineup_slots(), scoring={})
+        lineup, _p, opp, _op, _ms, _os, opp_lineup = self._box()
+        return LeagueDetail(
+            summary=self._summary(), roster=self._roster_slots(lineup), lineup_slots=self._lineup_slots(), scoring={},
+            opponent_roster=self._roster_slots(opp_lineup) if opp is not None and opp_lineup else None,
+        )
 
     def free_agents(self, league_id: str) -> list[Player]:
         lg, week = self.league(), self._week()

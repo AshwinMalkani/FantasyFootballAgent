@@ -66,6 +66,7 @@ class LeagueDetail(BaseModel):
     roster: list[RosterSlot]
     lineup_slots: list[str]
     scoring: dict[str, float] = {}
+    opponent_roster: list[RosterSlot] | None = None   # this week's opponent, starters + bench when available
 
 
 class LineupMove(BaseModel):

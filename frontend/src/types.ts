@@ -57,6 +57,7 @@ export interface LeagueDetail {
   roster: RosterSlot[]
   lineup_slots: string[]
   scoring: Record<string, number>
+  opponent_roster: RosterSlot[] | null
 }
 
 export interface LineupMove { slot: string; out: Player | null; in: Player; delta: number }

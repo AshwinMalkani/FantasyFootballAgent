@@ -7,14 +7,19 @@ import { Scoreline } from '../components/PlayerCell'
 import RosterTab from '../components/RosterTab'
 import LineupTab from '../components/LineupTab'
 import WaiversTab from '../components/WaiversTab'
+import MatchupTab from '../components/MatchupTab'
 
-const TABS = ['Roster', 'Lineup', 'Waivers'] as const
+const TABS = ['Matchup', 'Roster', 'Lineup', 'Waivers'] as const
 type Tab = (typeof TABS)[number]
 
 export default function League() {
   const { platform = '', leagueId = '' } = useParams()
-  const [tab, setTab] = useState<Tab>('Lineup')
-  const detail = useQuery({ queryKey: ['detail', platform, leagueId], queryFn: () => api.detail(platform, leagueId) })
+  const [tab, setTab] = useState<Tab>('Matchup')
+  const detail = useQuery({
+    queryKey: ['detail', platform, leagueId],
+    queryFn: () => api.detail(platform, leagueId),
+    refetchInterval: (q) => (q.state.data?.summary.in_progress ? 45_000 : false),
+  })
 
   if (detail.isLoading) return <p className="text-slate-400">Loading league…</p>
   if (detail.isError) {
@@ -54,6 +59,7 @@ export default function League() {
         ))}
       </div>
       <div className="mt-4">
+        {tab === 'Matchup' && <MatchupTab detail={d} />}
         {tab === 'Roster' && <RosterTab detail={d} />}
         {tab === 'Lineup' && <LineupTab platform={platform} leagueId={leagueId} />}
         {tab === 'Waivers' && <WaiversTab platform={platform} leagueId={leagueId} />}
