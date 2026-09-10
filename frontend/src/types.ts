@@ -151,3 +151,18 @@ export interface Activity {
   players: ActivityPlayer[]
   events: ActivityEvent[]
 }
+
+export interface NewsItem {
+  id: string
+  type: string
+  headline: string
+  description: string
+  story: string
+  published: string | null
+  link: string | null
+  premium: boolean
+  player: { espn_id: number; sleeper_id: string | null; name: string; position: string; nfl_team: string | null; injury_status: string | null }
+  leagues: { platform: Platform; league_id: string; league_name: string; slot: string; is_starter: boolean }[]
+}
+
+export interface News { days: number; players: number; unmapped: string[]; items: NewsItem[] }

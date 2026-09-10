@@ -87,6 +87,13 @@ latest ESPN play-by-play lines that mention them. The right-hand feed lists poin
 last poll and scoring plays. To preview it outside of game time:
 `http://localhost:5173/activity?season=2025&week=1&date=20250907`.
 
+## News tab
+
+Pulls ESPN's per-player fantasy news feed (Rotowire practice/injury notes, ESPN stories and video)
+for every player on any of your rosters, newest first, tagged with the leagues they're on. Players
+are matched to ESPN via Sleeper's `espn_id` with a name+position fallback against ESPN's public
+player list. Cached 15 minutes per player.
+
 ## API
 
 | Endpoint | Returns |
@@ -97,6 +104,7 @@ last poll and scoring plays. To preview it outside of game time:
 | `GET /api/leagues/{platform}/{id}/lineup` | current vs suggested starters and moves |
 | `GET /api/leagues/{platform}/{id}/waivers` | ranked free agents with suggested drops |
 | `GET /api/activity?bench=false` | game-day view: my players across leagues with live stats, plays, per-league points, and a change feed (add `season`, `week`, `date=YYYYMMDD` to replay a past week) |
+| `GET /api/news?days=7&bench=true` | recent news (ESPN stories + Rotowire player notes) for every rostered player, tagged with their leagues |
 | `POST /api/refresh` | clear all caches |
 
 ## Tests

@@ -35,16 +35,37 @@ def _fetch_players() -> dict:
     return {pid: {k: p.get(k) for k in keep} for pid, p in raw.items()}
 
 
+ESPN_POS = {1: "QB", 2: "RB", 3: "WR", 4: "TE", 5: "K", 16: "DEF"}
+
+
+def _fetch_espn_players() -> dict:
+    """ESPN's public player list: 'name|pos' -> espn id. Fills the gaps in Sleeper's espn_id field."""
+    r = httpx.get("https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/2026/players",
+                  params={"view": "players_wl"}, headers={"X-Fantasy-Filter": '{"filterActive":{"value":true}}'}, timeout=60)
+    r.raise_for_status()
+    out = {}
+    for p in r.json():
+        pos = ESPN_POS.get(p.get("defaultPositionId"))
+        if pos and p.get("fullName") and p.get("id"):
+            out[f"{norm_name(p['fullName'])}|{pos}"] = int(p["id"])
+    return out
+
+
 class PlayerDB:
     def __init__(self) -> None:
         self.by_id: dict[str, dict] = {}
         self.espn_to_sleeper: dict[int, str] = {}
         self.yahoo_to_sleeper: dict[int, str] = {}
         self.name_to_sleeper: dict[tuple[str, str], str] = {}
+        self.espn_by_name: dict[str, int] = {}
         self.load()
 
     def load(self) -> None:
         self.by_id = cached("sleeper_players", 24 * 3600, _fetch_players)
+        try:
+            self.espn_by_name = cached("espn_players", 24 * 3600, _fetch_espn_players)
+        except Exception:
+            self.espn_by_name = {}
         self.espn_to_sleeper.clear()
         self.yahoo_to_sleeper.clear()
         self.name_to_sleeper.clear()
@@ -79,6 +100,16 @@ class PlayerDB:
         if yahoo_id is not None and int(yahoo_id) in self.yahoo_to_sleeper:
             return self.yahoo_to_sleeper[int(yahoo_id)]
         return self.name_to_sleeper.get((norm_name(name), position))
+
+    def espn_id_for(self, sleeper_id: str | None) -> int | None:
+        """Sleeper's espn_id when present, else a name+position match against ESPN's player list."""
+        p = self.get(sleeper_id)
+        if not p:
+            return None
+        if p.get("espn_id"):
+            return int(p["espn_id"])
+        name = p.get("full_name") or " ".join(filter(None, [p.get("first_name"), p.get("last_name")]))
+        return self.espn_by_name.get(f"{norm_name(name)}|{p.get('position')}")
 
     def fantasy_relevant_ids(self) -> list[str]:
         out = []
