@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 
 from ..models import BENCH_SLOTS, LeagueError
 from ..providers.registry import all_leagues, build_providers, current_state
-from .live import live_stats, play_mentions, play_name_keys, plays, recent_events, record_changes, scoreboard, stat_line
+from .live import live_stats, play_mentions, play_name_pattern, plays, recent_events, record_changes, scoreboard, stat_line
 from .playparse import parse_def_play, parse_play, play_points
 from .scoring import approx_points, score_stat_line
 
@@ -109,9 +109,9 @@ def build_activity(include_bench: bool = False, season: int | None = None, week:
                     matched.append(p)
                     parsed_by_id[p["id"]] = parsed
         else:
-            keys = play_name_keys(e["name"])
-            matched = [p for p in game_plays[g["event_id"]] if play_mentions(p["text"], keys)]
-            parsed_by_id = {p["id"]: parse_play(p["text"], keys[0], e["nfl_team"]) for p in matched}
+            key = play_name_pattern(e["name"])
+            matched = [p for p in game_plays[g["event_id"]] if play_mentions(p["text"], key)]
+            parsed_by_id = {p["id"]: parse_play(p["text"], key, e["nfl_team"]) for p in matched}
         out = []
         for p in matched:
             parsed = parsed_by_id.get(p["id"])

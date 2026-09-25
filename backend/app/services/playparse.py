@@ -92,15 +92,16 @@ def _clean(text: str) -> str:
 
 
 def _mentions(sentence: str, key: str) -> bool:
-    return re.search(re.escape(key) + r"(?![A-Za-z])", sentence) is not None
+    """`key` is a regex from play_name_pattern(), already anchored at its end."""
+    return re.search(key, sentence) is not None
 
 
 def _starts_with(sentence: str, key: str) -> bool:
-    return re.match(re.escape(key) + r"(?![A-Za-z])", sentence.strip()) is not None
+    return re.match(key, sentence.strip()) is not None
 
 
 def parse_play(text: str, key: str, team: str | None) -> dict | None:
-    """key is the player's play-text name ('D.Henry'). Returns {"summary", "delta"} or None if no fantasy impact."""
+    """key is a play-text name regex from play_name_pattern(). Returns {"summary", "delta"} or None."""
     t = _clean(text)
     sentences = [s.strip() for s in re.split(r"(?<=[.!])\s+", t) if s.strip()]
     delta: dict[str, float] = {}
@@ -134,7 +135,7 @@ def parse_play(text: str, key: str, team: str | None) -> dict | None:
 
         td = "TOUCHDOWN" in up
         # Kicks
-        m = re.search(re.escape(key) + r" (\d+) yard field goal is (GOOD|No Good|BLOCKED)", s, re.I)
+        m = re.search(key + r" (\d+) yard field goal is (GOOD|No Good|BLOCKED)", s, re.I)
         if m:
             dist, res = int(m.group(1)), m.group(2).upper()
             if res == "GOOD":
@@ -144,7 +145,7 @@ def parse_play(text: str, key: str, team: str | None) -> dict | None:
                 delta["fgmiss"] = delta.get("fgmiss", 0) + 1
                 bits.append(f"{dist}-yd FG missed")
             continue
-        m = re.search(re.escape(key) + r" extra point is (GOOD|No Good|BLOCKED)", s, re.I)
+        m = re.search(key + r" extra point is (GOOD|No Good|BLOCKED)", s, re.I)
         if m:
             if m.group(1).upper() == "GOOD":
                 delta["xpm"] = delta.get("xpm", 0) + 1
@@ -157,7 +158,7 @@ def parse_play(text: str, key: str, team: str | None) -> dict | None:
             continue  # kickoff
 
         # Passing plays
-        if " pass " in s or s.startswith(key + " pass"):
+        if " pass " in s or re.match(key + r"\s+pass", s):
             passer = _starts_with(s, key)
             intercepted = "INTERCEPTED" in up
             incomplete = "INCOMPLETE" in up
@@ -181,7 +182,7 @@ def parse_play(text: str, key: str, team: str | None) -> dict | None:
                 if incomplete or intercepted:
                     continue
                 y = _yards(s)
-                if y is not None and not re.search(r"intended for " + re.escape(key), s):
+                if y is not None and not re.search(r"intended for " + key, s):
                     delta["rec"] = delta.get("rec", 0) + 1
                     delta["rec_yd"] = delta.get("rec_yd", 0) + y
                     if td:
@@ -204,7 +205,7 @@ def parse_play(text: str, key: str, team: str | None) -> dict | None:
                     bits.append(f"{y}-yd rush")
 
         # Fumbles (any sentence mentioning the player)
-        if re.search(re.escape(key) + r"(?![A-Za-z]).*FUMBLES", s):
+        if re.search(key + r".*FUMBLES", s):
             rec = re.search(r"RECOVERED by ([A-Z]{2,3})-", s)
             lost = bool(rec) and rec.group(1) not in {team, ESPN_TEXT_ABBR.get(team or "", "")}
             if lost:

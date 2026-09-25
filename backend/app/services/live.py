@@ -103,22 +103,26 @@ def plays(event_id: str, limit: int = 150) -> list[dict]:
 
 # ---- name matching -----------------------------------------------------
 
-def play_name_keys(full_name: str) -> list[str]:
-    """ESPN play text abbreviates names as 'F.Lastname' (e.g. 'B.Robinson', 'A.St. Brown')."""
-    parts = full_name.replace("’", "'").split()
+def play_name_pattern(full_name: str) -> str:
+    """Regex matching how ESPN writes this player in play text.
+
+    Usually 'F.Lastname', but when two players on the same team share a first
+    initial ESPN lengthens it ('Bi.Robinson' for Bijan vs 'Br.Robinson' for
+    Brashard), so accept any prefix of the first name. 'Br' is not a prefix of
+    'Bijan', which is what keeps the two apart.
+    """
+    parts = full_name.replace("\u2019", "'").split()
     parts = [p for p in parts if p.lower().strip(".") not in ("jr", "sr", "ii", "iii", "iv", "v")]
     if len(parts) < 2:
-        return [full_name]
+        return re.escape(full_name) + r"(?![A-Za-z])"
     first, last = parts[0], " ".join(parts[1:])
-    return [f"{first[0]}.{last}", full_name]
+    # Longest prefix first so the alternation prefers the most specific form.
+    prefixes = "|".join(re.escape(first[:i]) for i in range(len(first), 0, -1))
+    return r"(?:" + prefixes + r")[. ]" + re.escape(last) + r"(?![A-Za-z])"
 
 
-def play_mentions(play_text: str, keys: list[str]) -> bool:
-    for k in keys:
-        # Word boundary after the name avoids 'J.Allen' matching 'J.Allenby'.
-        if re.search(re.escape(k) + r"(?![A-Za-z])", play_text):
-            return True
-    return False
+def play_mentions(play_text: str, pattern: str) -> bool:
+    return re.search(pattern, play_text) is not None
 
 
 # ---- stat lines ----------------------------------------------------------

@@ -1,14 +1,23 @@
 from app.services import live
-from app.services.live import play_mentions, play_name_keys, record_changes, recent_events, reset_tracking, stat_line
+from app.services.live import play_mentions, play_name_pattern, record_changes, recent_events, reset_tracking, stat_line
 
 
 def test_play_name_matching():
-    keys = play_name_keys("Bijan Robinson")
-    assert keys[0] == "B.Robinson"
-    assert play_mentions("(Shotgun) M.Penix pass short right to B.Robinson for 50 yards, TOUCHDOWN.", keys)
-    assert not play_mentions("B.Robinsonville kicks off", keys)
-    assert play_name_keys("Amon-Ra St. Brown")[0] == "A.St. Brown"
-    assert play_name_keys("Marvin Harrison Jr.")[0] == "M.Harrison"
+    bijan = play_name_pattern("Bijan Robinson")
+    assert play_mentions("(Shotgun) M.Penix pass short right to B.Robinson for 50 yards, TOUCHDOWN.", bijan)
+    assert not play_mentions("B.Robinsonville kicks off", bijan)
+    assert play_mentions("A.St. Brown ran ob at DET 40 for 9 yards.", play_name_pattern("Amon-Ra St. Brown"))
+    assert play_mentions("M.Harrison to ARI 30 for 5 yards.", play_name_pattern("Marvin Harrison Jr."))
+
+
+def test_same_initial_teammates_stay_apart():
+    """ESPN lengthens the initial when a team has two of a surname: Bi. vs Br.Robinson."""
+    bijan = play_name_pattern("Bijan Robinson")
+    other = play_name_pattern("Brashard Robinson")
+    assert play_mentions("Bi.Robinson left tackle to ATL 34 for 4 yards.", bijan)
+    assert not play_mentions("Br.Robinson to ATL 30 for 24 yards.", bijan)
+    assert play_mentions("Br.Robinson to ATL 30 for 24 yards.", other)
+    assert not play_mentions("Bi.Robinson left tackle to ATL 34 for 4 yards.", other)
 
 
 def test_stat_line_rb():
