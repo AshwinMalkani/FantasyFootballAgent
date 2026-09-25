@@ -27,6 +27,7 @@ class EspnProvider:
         self.live = (live or {}).get("stats", {})
         self.board = (live or {}).get("board", {})
         self._league = None
+        self._box_cache = None
 
     # ---- raw ---------------------------------------------------------
     def league(self):
@@ -58,6 +59,11 @@ class EspnProvider:
 
     def _box(self):
         """(my_box_lineup, my_projected, opp_team, opp_projected, my_score, opp_score, opp_box_lineup)"""
+        if self._box_cache is None:
+            self._box_cache = self._fetch_box()
+        return self._box_cache
+
+    def _fetch_box(self):
         lg, me, week = self.league(), self.my_team(), self._week()
         for bs in lg.box_scores(week):
             if getattr(bs.home_team, "team_id", None) == me.team_id:
